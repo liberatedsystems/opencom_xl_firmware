@@ -350,13 +350,13 @@ void led_indicate_warning(int cycles) {
 			bool forever = (cycles == 0) ? true : false;
 			cycles = forever ? 1 : cycles;
 			while(cycles > 0) {
-		    led_tx_off();
+		    led_rx_off();
 		    delay(100);
-		    led_tx_on();
+		    led_rx_on();
 		    delay(100);
 		    if (!forever) cycles--;
 		  }
-		  led_tx_off();
+		  led_rx_off();
 		}
 	#endif
 #endif
