@@ -238,11 +238,11 @@ void led_indicate_error(int cycles) {
 		bool forever = (cycles == 0) ? true : false;
 		cycles = forever ? 1 : cycles;
 		while(cycles > 0) {
-	        digitalWrite(pin_led_rx, HIGH);
-	        digitalWrite(pin_led_tx, LOW);
+            led_rx_on();
+            led_tx_off();
 	        delay(100);
-	        digitalWrite(pin_led_rx, LOW);
-	        digitalWrite(pin_led_tx, HIGH);
+            led_rx_off();
+            led_tx_on();
 	        delay(100);
 	        if (!forever) cycles--;
 	    }
