@@ -38,7 +38,7 @@
   #define BOARD_RNODE_NG_21   0x41
   #define BOARD_RNODE_NG_22   0x42
   #define BOARD_GENERIC_NRF52 0x50
-  #define BOARD_RAK4631       0x51
+  #define BOARD_FREENODE       0x52
 
   #define OLED 0x01
   #define EINK_BW 0x02
@@ -616,7 +616,7 @@
     #endif
   
   #elif MCU_VARIANT == MCU_NRF52
-    #if BOARD_MODEL == BOARD_RAK4631
+    #if BOARD_MODEL == BOARD_FREENODE
       #define HAS_EEPROM false
       #define HAS_DISPLAY true
       #define DISPLAY EINK_BW
@@ -663,7 +663,7 @@
       };
 
         #define INTERFACE_SPI
-        // Required because on RAK4631, non-default SPI pins must be initialised when class is declared.
+        // Required because on FREENODE, non-default SPI pins must be initialised when class is declared.
       const SPIClass interface_spi[1] = {
             // SX1262
             SPIClass(

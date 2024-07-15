@@ -75,7 +75,7 @@ void busyCallback(const void* p) {
   #define SCL_OLED 17
   #define SDA_OLED 18
   #endif
-#elif BOARD_MODEL == BOARD_RAK4631
+#elif BOARD_MODEL == BOARD_FREENODE
   #if DISPLAY == OLED
   // todo: add support for OLED board
   #elif DISPLAY == EINK_BW
@@ -101,14 +101,14 @@ void busyCallback(const void* p) {
 
 #include "Graphics.h"
 
-#if BOARD_MODEL != BOARD_RAK4631
-// support for BOARD_RAK4631 OLED not implemented yet
+#if BOARD_MODEL != BOARD_FREENODE
+// support for BOARD_FREENODE OLED not implemented yet
 #if DISPLAY == OLED
 Adafruit_SSD1306 display(DISP_W, DISP_H, &Wire, DISP_RST);
 float disp_target_fps = 7;
 #endif
 #endif
-#if BOARD_MODEL == BOARD_RAK4631
+#if BOARD_MODEL == BOARD_FREENODE
 #if DISPLAY == EINK_BW
 GxEPD2_BW<DISPLAY_MODEL, DISPLAY_MODEL::HEIGHT> display(DISPLAY_MODEL(pin_disp_cs, pin_disp_dc, pin_disp_reset, pin_disp_busy));
 float disp_target_fps = 0.2;
@@ -222,7 +222,7 @@ bool display_init() {
       delay(50);
       digitalWrite(pin_display_en, HIGH);
       Wire.begin(SDA_OLED, SCL_OLED);
-    #elif BOARD_MODEL == BOARD_RAK4631
+    #elif BOARD_MODEL == BOARD_FREENODE
       #if DISPLAY == OLED
       #elif DISPLAY == EINK_BW || DISPLAY == EINK_3C
       pinMode(pin_disp_en, INPUT_PULLUP);
@@ -282,7 +282,7 @@ bool display_init() {
       #elif BOARD_MODEL == BOARD_HELTEC32_V2
         disp_mode = DISP_MODE_PORTRAIT;
         display.setRotation(1);
-      #elif BOARD_MODEL == BOARD_RAK4631
+      #elif BOARD_MODEL == BOARD_FREENODE
         #if DISPLAY == OLED
         #elif DISPLAY == EINK_BW || DISPLAY == EINK_3C
         disp_mode = DISP_MODE_PORTRAIT;

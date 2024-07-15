@@ -44,7 +44,7 @@
   int bat_charged_samples = 0;
   bool bat_voltage_dropping = false;
   float bat_delay_v = 0;
-#elif BOARD_MODEL == BOARD_RAK4631
+#elif BOARD_MODEL == BOARD_FREENODE
 #include "nrfx_power.h"
 #define BAT_C_SAMPLES   7
 #define BAT_D_SAMPLES   2
@@ -214,7 +214,7 @@ void measure_battery() {
       battery_ready = false;
     }
 
-  #elif BOARD_MODEL == BOARD_RAK4631
+  #elif BOARD_MODEL == BOARD_FREENODE
     battery_installed = true;
     battery_indeterminate = false;
 
@@ -421,7 +421,7 @@ bool init_pmu() {
     PMU->setPowerKeyPressOffTime(XPOWERS_POWEROFF_4S);
 
     return true; 
-  #elif BOARD_MODEL == BOARD_RAK4631
+  #elif BOARD_MODEL == BOARD_FREENODE
     // board doesn't have PMU but we can measure batt voltage
 
     // prep ADC for reading battery level

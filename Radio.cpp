@@ -731,7 +731,7 @@ void sx126x::sleep()
 
 void sx126x::enableTCXO() {
   if (_tcxo) {
-    #if BOARD_MODEL == BOARD_RAK4631 || BOARD_MODEL == BOARD_HELTEC32_V3
+    #if BOARD_MODEL == BOARD_FREENODE || BOARD_MODEL == BOARD_HELTEC32_V3
       uint8_t buf[4] = {MODE_TCXO_3_3V_6X, 0x00, 0x00, 0xFF};
     #elif BOARD_MODEL == BOARD_TBEAM
       uint8_t buf[4] = {MODE_TCXO_1_8V_6X, 0x00, 0x00, 0xFF};

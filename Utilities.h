@@ -205,7 +205,7 @@ uint8_t boot_vector = 0x00;
 		void led_tx_off() { digitalWrite(pin_led_tx, LOW); }
 	#endif
 #elif MCU_VARIANT == MCU_NRF52
-    #if BOARD_MODEL == BOARD_RAK4631
+    #if BOARD_MODEL == BOARD_FREENODE
 		void led_rx_on()  { analogWrite(pin_led_rx, 1); }
 		void led_rx_off() {	analogWrite(pin_led_rx, 0); }
 		void led_tx_on()  { analogWrite(pin_led_tx, 1); }
@@ -1356,7 +1356,7 @@ bool eeprom_model_valid() {
 	if (model == MODEL_C4 || model == MODEL_C9) {
 	#elif BOARD_MODEL == BOARD_HELTEC32_V3
 	if (model == MODEL_C5 || model == MODEL_CA) {
-    #elif BOARD_MODEL == BOARD_RAK4631
+    #elif BOARD_MODEL == BOARD_FREENODE
     if (model == MODEL_11 || model == MODEL_12) {
     #elif BOARD_MODEL == BOARD_FREENODE
     if (model == MODEL_21) {
