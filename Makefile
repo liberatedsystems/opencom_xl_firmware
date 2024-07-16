@@ -202,6 +202,11 @@ upload-rak4631:
 	arduino-cli upload -p /dev/ttyACM0 --fqbn rakwireless:nrf52:WisCoreRAK4631Board
 	unzip -o build/rakwireless.nrf52.WisCoreRAK4631Board/RNode_Firmware_CE.ino.zip -d build/rakwireless.nrf52.WisCoreRAK4631Board
 	rnodeconf /dev/ttyACM0 --firmware-hash $$(sha256sum ./build/rakwireless.nrf52.WisCoreRAK4631Board/RNode_Firmware_CE.ino.bin | grep -o '^\S*')
+	@echo
+	@echo This target currently uses a custom version of rnodeconf to set the firmware length on the device.
+	@echo This will be removed once the feature has been included upstream, or another solution has been found.
+	@echo
+	python3 rnodeconf.py /dev/ttyACM0 --set-firmware-length $$(ls -l ./build/rakwireless.nrf52.WisCoreRAK4631Board/RNode_Firmware_CE.ino.bin | awk '{print $$5}')
 
 
 
