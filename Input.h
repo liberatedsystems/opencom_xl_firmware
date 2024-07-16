@@ -15,11 +15,11 @@
 
 #ifndef INPUT_H
   #define INPUT_H
-  
-  #define PIN_BUTTON pin_btn_usr1
 
   #define PRESSED LOW
   #define RELEASED HIGH
+
+  #define BUTTON_MIN_DURATION 50
 
   #define EVENT_ALL                 0x00
   #define EVENT_CLICKS              0x01

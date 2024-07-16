@@ -87,7 +87,7 @@ void setup() {
 
   Serial.begin(serial_baudrate);
 
-  #if BOARD_MODEL != BOARD_RAK4631 && BOARD_MODEL != BOARD_RNODE_NG_22
+  #if BOARD_MODEL != BOARD_FREENODE && BOARD_MODEL != BOARD_RNODE_NG_22
   // Some boards need to wait until the hardware UART is set up before booting
   // the full firmware. In the case of the RAK4631, the line below will wait
   // until a serial connection is actually established with a master. Thus, it
@@ -98,6 +98,10 @@ void setup() {
   // Configure input and output pins
   #if HAS_INPUT
     input_init();
+  #endif
+
+  #if HAS_BUZZER
+  pinMode(PIN_BUZZER, OUTPUT);
   #endif
 
   #if HAS_NP == false
@@ -465,6 +469,9 @@ void flushQueue(RadioInterface* radio) {
     uint8_t data_byte;
 
     while (!fifo16_isempty(&packet_starts[index])) {
+      #if HAS_BUZZER
+      update_buzzer_tone(TX_HI_TONE, TX_LO_TONE);
+      #endif
       uint16_t start = fifo16_pop(&packet_starts[index]);
       uint16_t length = fifo16_pop(&packet_lengths[index]);
 
@@ -1153,7 +1160,6 @@ void loop() {
         }
     }
 
-
   // If at least one radio is online then we can continue
   if (ready) {
       if (packet_ready) {
@@ -1274,6 +1280,10 @@ void loop() {
   #if HAS_INPUT
     input_read();
   #endif
+
+  #if HAS_BUZZER
+      update_buzzer_notone();
+  #endif
 }
 
 void process_serial() {
@@ -1281,26 +1291,15 @@ void process_serial() {
       if (!fifo_isempty(&serialFIFO)) serial_poll();
 }
 
-void sleep_now() {
-  #if HAS_SLEEP == true
-    #if BOARD_MODEL == BOARD_RNODE_NG_22
-      display_intensity = 0;
-      update_display(true);
-    #endif
-    #if PIN_DISP_SLEEP >= 0
-      pinMode(PIN_DISP_SLEEP, OUTPUT);
-      digitalWrite(PIN_DISP_SLEEP, DISP_SLEEP_LEVEL);
-    #endif
-    esp_sleep_enable_ext0_wakeup(PIN_WAKEUP, WAKEUP_LEVEL);
-    esp_deep_sleep_start();
-  #endif
-}
-
+#if HAS_INPUT
 void button_event(uint8_t event, unsigned long duration) {
-  if (duration > 2000) {
-    sleep_now();
+  if (duration > BUTTON_MIN_DURATION) {
+    #if HAS_BUZZER_CTRL
+        toggle_buzzer_enable();
+    #endif
   }
 }
+#endif
 
 void poll_buffers() {
     process_serial();

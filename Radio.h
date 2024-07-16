@@ -59,6 +59,10 @@ void led_indicate_airtime_lock();
 extern portMUX_TYPE update_lock;
 #endif
 
+#if HAS_BUZZER
+extern void update_buzzer_tone(uint16_t, uint16_t);
+#endif
+
 class RadioInterface : public Stream {
 public:
     // todo: in the future define _spiModem and _spiSettings from here for inheritence by child classes
@@ -237,6 +241,9 @@ public:
                       _last_dcd = _last_status_update;
                       _dcd_led = true;
                       _dcd = true;
+                      #if HAS_BUZZER
+                      update_buzzer_tone(RX_HI_TONE, RX_LO_TONE);
+                      #endif
                   }
               }
           } else {

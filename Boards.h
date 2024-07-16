@@ -634,6 +634,21 @@
       #define BLE_MANUFACTURER "RAK Wireless"
       #define BLE_MODEL "RAK4640"
 
+      #define HAS_BUZZER true
+      #define PIN_BUZZER WB_IO2
+
+      // todo, I would much rather these be in Buzzer.h
+      #define RX_LO_TONE 400
+      #define RX_HI_TONE 500
+      #define TX_LO_TONE 450
+      #define TX_HI_TONE 550
+      #define MAX_BUZZER_DELAY 100
+
+      #define HAS_BUZZER_CTRL true
+
+      #define HAS_INPUT false
+      #define PIN_BUTTON WB_SW1
+
       #define INTERFACE_COUNT 1
 
       // first interface in list is the primary

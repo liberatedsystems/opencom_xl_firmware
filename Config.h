@@ -133,4 +133,12 @@
     RadioInterface* selected_radio;
     RadioInterface* interface_obj[INTERFACE_COUNT];
     RadioInterface* interface_obj_sorted[INTERFACE_COUNT];
+
+    #if HAS_BUZZER
+    // Buzzer
+    bool buzzer_enabled = true;
+    unsigned long last_tone_toggle = 0;
+    uint16_t buzzer_delay = 0;
+    uint16_t last_buzzer_tone = 0;
+    #endif
 #endif

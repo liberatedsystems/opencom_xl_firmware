@@ -58,6 +58,10 @@ uint8_t eeprom_read(uint32_t mapped_addr);
 	#include "Input.h"
 #endif
 
+#if HAS_BUZZER
+    #include "Buzzer.h"
+#endif
+
 #if MCU_VARIANT == MCU_ESP32 || MCU_VARIANT == MCU_NRF52
 	#include "Device.h"
 #endif
