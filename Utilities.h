@@ -356,7 +356,7 @@ void led_indicate_warning(int cycles) {
 		    delay(100);
 		    if (!forever) cycles--;
 		  }
-		  led_rx_off();
+		  led_tx_off();
 		}
 	#endif
 #endif
