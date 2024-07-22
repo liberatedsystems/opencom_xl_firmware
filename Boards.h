@@ -628,6 +628,7 @@
       #define HAS_SD false
       #define CONFIG_UART_BUFFER_SIZE 6144
       #define CONFIG_QUEUE_0_SIZE 6144
+      #define CONFIG_QUEUE_1_SIZE 20000
       #define CONFIG_QUEUE_MAX_LENGTH 200
       #define EEPROM_SIZE 296
       #define EEPROM_OFFSET EEPROM_SIZE-EEPROM_RESERVED
@@ -646,20 +647,26 @@
 
       #define HAS_BUZZER_CTRL true
 
-      #define HAS_INPUT false
+      #define HAS_INPUT true
       #define PIN_BUTTON WB_SW1
 
-      #define INTERFACE_COUNT 1
+      #define INTERFACE_COUNT 2
 
       // first interface in list is the primary
-      const uint8_t interfaces[INTERFACE_COUNT] = {SX126X};
+      const uint8_t interfaces[INTERFACE_COUNT] = {SX126X, SX128X};
       const bool interface_cfg[INTERFACE_COUNT][3] = { 
                     // SX1262
           {
               false, // DEFAULT_SPI
               true, // HAS_TCXO
               true  // DIO2_AS_RF_SWITCH
-          }
+          }, 
+                    // SX1280
+          {
+              true, // DEFAULT_SPI
+              false,// HAS_TCXO
+              false // DIO2_AS_RF_SWITCH
+          } 
       };
       const int8_t interface_pins[INTERFACE_COUNT][10] = { 
                   // SX1262
@@ -674,11 +681,24 @@
               -1, // pin_txen
               37, // pin_rxen
               -1  // pin_tcxo_enable
-          }
+          },
+                  // SX1280
+          {
+              24, // pin_ss
+               3, // pin_sclk
+              30, // pin_mosi
+              29, // pin_miso
+              25, // pin_busy
+              15, // pin_dio
+              16, // pin_reset
+              20, // pin_txen
+              19, // pin_rxen
+              -1  // pin_tcxo_enable
+          } 
       };
 
         #define INTERFACE_SPI
-        // Required because on FREENODE, non-default SPI pins must be initialised when class is declared.
+        // only one unique SPI class needed, rest can use default SPI
       const SPIClass interface_spi[1] = {
             // SX1262
             SPIClass(
@@ -689,6 +709,7 @@
                )
       };
 
+
       const int pin_disp_cs = SS;
       const int pin_disp_dc = WB_IO1;
       const int pin_disp_reset = -1;
@@ -697,7 +718,6 @@
 
       const int pin_led_rx = LED_BLUE;
       const int pin_led_tx = LED_GREEN;
-
     #else
       #error An unsupported nRF board was selected. Cannot compile RNode firmware.
     #endif

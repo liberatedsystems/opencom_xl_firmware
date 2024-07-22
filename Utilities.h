@@ -1363,8 +1363,6 @@ bool eeprom_model_valid() {
 	#elif BOARD_MODEL == BOARD_HELTEC32_V3
 	if (model == MODEL_C5 || model == MODEL_CA) {
     #elif BOARD_MODEL == BOARD_FREENODE
-    if (model == MODEL_11 || model == MODEL_12) {
-    #elif BOARD_MODEL == BOARD_FREENODE
     if (model == MODEL_21) {
 	#elif BOARD_MODEL == BOARD_HUZZAH32
 	if (model == MODEL_FF) {
