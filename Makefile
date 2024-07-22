@@ -206,7 +206,7 @@ upload-freenode:
 	@echo This target currently uses a custom version of rnodeconf to set the firmware length on the device.
 	@echo This will be removed once the feature has been included upstream, or another solution has been found.
 	@echo
-	@sleep 2
+	@sleep 3
 	python3 rnodeconf.py /dev/ttyACM0 --set-firmware-length $$(ls -l ./build/rakwireless.nrf52.WisCoreRAK4631Board/freeNode_Firmware.ino.bin | awk '{print $$5}')
 
 
