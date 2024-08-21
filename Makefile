@@ -21,12 +21,7 @@ clean:
 	-rm -r ./build
 	-rm ./Release/rnode_firmware*
 
-prep: prep-avr prep-esp32 prep-samd
-
-prep-avr:
-	arduino-cli core update-index --config-file arduino-cli.yaml
-	arduino-cli core install arduino:avr --config-file arduino-cli.yaml
-	arduino-cli core install unsignedio:avr --config-file arduino-cli.yaml
+prep: prep-esp32 prep-samd
 
 prep-esp32:
 	arduino-cli core update-index --config-file arduino-cli.yaml
@@ -34,6 +29,7 @@ prep-esp32:
 	arduino-cli lib install "Adafruit SSD1306"
 	arduino-cli lib install "XPowersLib"
 	arduino-cli lib install "Crypto"
+	pip install pyserial rns --upgrade --user --break-system-packages # This looks scary, but it's actually just telling pip to install packages as a user instead of trying to install them systemwide, which bypasses the "externally managed environment" error.
 
 prep-samd:
 	arduino-cli core update-index --config-file arduino-cli.yaml
@@ -45,7 +41,8 @@ prep-nrf:
 	arduino-cli lib install "Crypto"
 	arduino-cli lib install "Adafruit GFX Library"
 	arduino-cli lib install "GxEPD2"
-	pip install adafruit-nrfutil --upgrade
+	pip install pyserial rns --upgrade --user --break-system-packages
+	pip install adafruit-nrfutil --upgrade --user --break-system-packages # This looks scary, but it's actually just telling pip to install packages as a user instead of trying to install them systemwide, which bypasses the "externally managed environment" error.
 
 console-site:
 	make -C Console clean site
@@ -58,12 +55,6 @@ spiffs-image:
 upload-spiffs:
 	@echo Deploying SPIFFS image...
 	python ./Release/esptool/esptool.py --chip esp32 --port /dev/ttyACM0 --baud 921600 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 80m --flash_size 4MB 0x210000 ./Release/console_image.bin
-
-firmware:
-	arduino-cli compile --fqbn unsignedio:avr:rnode
-
-firmware-mega2560:
-	arduino-cli compile --fqbn arduino:avr:mega
 
 firmware-tbeam:
 	arduino-cli compile --fqbn esp32:esp32:t-beam -e --build-property "build.partitions=no_ota" --build-property "upload.maximum_size=2097152" --build-property "compiler.cpp.extra_flags=\"-DBOARD_MODEL=0x33\""
@@ -124,12 +115,6 @@ firmware-rak4631_sx1280:
 
 firmware-freenode:
 	arduino-cli compile --fqbn rakwireless:nrf52:WisCoreRAK4631Board -e --build-property "build.partitions=no_ota" --build-property "upload.maximum_size=2097152" --build-property "compiler.cpp.extra_flags=\"-DBOARD_MODEL=0x52\" \"-DBOARD_VARIANT=0x21\""
-
-upload:
-	arduino-cli upload -p /dev/ttyUSB0 --fqbn unsignedio:avr:rnode
-
-upload-mega2560:
-	arduino-cli upload -p /dev/ttyACM0 --fqbn arduino:avr:mega
 
 upload-tbeam:
 	arduino-cli upload -p /dev/ttyACM0 --fqbn esp32:esp32:t-beam
@@ -378,15 +363,11 @@ release-genericesp32:
 	zip --junk-paths ./Release/rnode_firmware_esp32_generic.zip ./Release/esptool/esptool.py ./Release/console_image.bin build/rnode_firmware_esp32_generic.boot_app0 build/rnode_firmware_esp32_generic.bin build/rnode_firmware_esp32_generic.bootloader build/rnode_firmware_esp32_generic.partitions
 	rm -r build
 
-release-mega2560:
-	arduino-cli compile --fqbn arduino:avr:mega -e --build-property "compiler.cpp.extra_flags=\"-DMODEM=0x01\""
-	cp build/arduino.avr.mega/opencom_xl_firmware.ino.hex Release/rnode_firmware_m2560.hex
-	rm -r build
-
 release-freenode:
 	arduino-cli compile --fqbn rakwireless:nrf52:WisCoreRAK4631Board -e --build-property "build.partitions=no_ota" --build-property "upload.maximum_size=2097152" --build-property "compiler.cpp.extra_flags=\"-DBOARD_MODEL=0x51\""
 	cp build/rakwireless.nrf52.WisCoreRAK4631Board/opencom_xl_firmware.ino.hex build/opencom_xl_firmware.hex
 	adafruit-nrfutil dfu genpkg --dev-type 0x0052 --application build/opencom_xl_firmware.hex Release/opencom_xl_firmware.zip
+
 release-rak4631:
 	arduino-cli compile --fqbn rakwireless:nrf52:WisCoreRAK4631Board -e --build-property "build.partitions=no_ota" --build-property "upload.maximum_size=2097152" --build-property "compiler.cpp.extra_flags=\"-DBOARD_MODEL=0x51\" \"-DBOARD_VARIANT=0x12\""
 	cp build/rakwireless.nrf52.WisCoreRAK4631Board/RNode_Firmware_CE.ino.hex build/rnode_firmware_rak4631.hex

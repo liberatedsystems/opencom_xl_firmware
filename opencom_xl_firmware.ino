@@ -17,10 +17,25 @@
 #include <SPI.h>
 #include "Utilities.h"
 
-#if BOARD_MODEL == BOARD_HELTEC32_V3
-// Default stack size for loop function on Heltec32 V3 is not large enough,
-// must be increased to 11kb to prevent crashes.
-SET_LOOP_TASK_STACK_SIZE(11 * 1024);  // 11KB
+#if MCU_VARIANT == MCU_NRF52 
+        #define INTERFACE_SPI
+        // Required because on RAK4631, non-default SPI pins must be initialised when class is declared.
+      SPIClass interface_spi[1] = {
+            // SX1262
+            SPIClass(
+                NRF_SPIM2, 
+                interface_pins[0][3], 
+                interface_pins[0][1], 
+                interface_pins[0][2]
+               )
+      };
+#endif
+
+#ifndef INTERFACE_SPI
+// INTERFACE_SPI is only required on NRF52 platforms, as the SPI pins are set in the class constructor and not by a setter method.
+// Even if custom SPI interfaces are not needed, the array must exist to prevent compilation errors.
+#define INTERFACE_SPI
+SPIClass interface_spi[1];
 #endif
 
 FIFOBuffer serialFIFO;
@@ -126,7 +141,7 @@ void setup() {
   for (int i = 0; i < INTERFACE_COUNT; i++) {
       fifo16_init(&packet_starts[i], packet_starts_buf, CONFIG_QUEUE_MAX_LENGTH);
       fifo16_init(&packet_lengths[i], packet_lengths_buf, CONFIG_QUEUE_MAX_LENGTH);
-      packet_queue[i] = (uint8_t*)malloc(getQueueSize(i));
+      packet_queue[i] = (uint8_t*)malloc(getQueueSize(i)+1);
   }
 
   // Create and configure interface objects
@@ -138,13 +153,13 @@ void setup() {
               sx126x* obj;
               // if default spi enabled
               if (interface_cfg[i][0]) {
-                obj = new sx126x(i, SPI, interface_cfg[i][1],
+                obj = new sx126x(i, &SPI, interface_cfg[i][1],
                 interface_cfg[i][2], interface_pins[i][0], interface_pins[i][1],
                 interface_pins[i][2], interface_pins[i][3], interface_pins[i][6],
                 interface_pins[i][5], interface_pins[i][4], interface_pins[i][8]);
               }
               else {
-            obj = new sx126x(i, interface_spi[i], interface_cfg[i][1],
+            obj = new sx126x(i, &interface_spi[i], interface_cfg[i][1],
             interface_cfg[i][2], interface_pins[i][0], interface_pins[i][1],
             interface_pins[i][2], interface_pins[i][3], interface_pins[i][6],
             interface_pins[i][5], interface_pins[i][4], interface_pins[i][8]);
@@ -161,12 +176,12 @@ void setup() {
               sx127x* obj;
               // if default spi enabled
               if (interface_cfg[i][0]) {
-            obj = new sx127x(i, SPI, interface_pins[i][0],
+            obj = new sx127x(i, &SPI, interface_pins[i][0],
             interface_pins[i][1], interface_pins[i][2], interface_pins[i][3],
             interface_pins[i][6], interface_pins[i][5], interface_pins[i][4]);
               }
               else {
-            obj = new sx127x(i, interface_spi[i], interface_pins[i][0],
+            obj = new sx127x(i, &interface_spi[i], interface_pins[i][0],
             interface_pins[i][1], interface_pins[i][2], interface_pins[i][3],
             interface_pins[i][6], interface_pins[i][5], interface_pins[i][4]);
               }
@@ -181,13 +196,13 @@ void setup() {
               sx128x* obj;
               // if default spi enabled
               if (interface_cfg[i][0]) {
-            obj = new sx128x(i, SPI, interface_cfg[i][1],
+            obj = new sx128x(i, &SPI, interface_cfg[i][1],
             interface_pins[i][0], interface_pins[i][1], interface_pins[i][2],
             interface_pins[i][3], interface_pins[i][6], interface_pins[i][5],
             interface_pins[i][4], interface_pins[i][8], interface_pins[i][7]);
             }
             else {
-            obj = new sx128x(i, interface_spi[i], interface_cfg[i][1],
+            obj = new sx128x(i, &interface_spi[i], interface_cfg[i][1],
             interface_pins[i][0], interface_pins[i][1], interface_pins[i][2],
             interface_pins[i][3], interface_pins[i][6], interface_pins[i][5],
             interface_pins[i][4], interface_pins[i][8], interface_pins[i][7]);
@@ -577,9 +592,9 @@ void serialCallback(uint8_t sbyte) {
 
     if (getInterfaceIndex(command) < INTERFACE_COUNT) {
             uint8_t index = getInterfaceIndex(command);
-        if (!fifo16_isfull(&packet_starts[index]) && queued_bytes[index] < (getQueueSize(index))) {
+        if (!fifo16_isfull(&packet_starts[index]) && (queued_bytes[index] < (getQueueSize(index)))) {
             uint16_t s = current_packet_start[index];
-            int16_t e = queue_cursor[index]-1; if (e == -1) e = (getQueueSize(index))-1;
+            uint16_t e = queue_cursor[index]-1; if (e == -1) e = (getQueueSize(index))-1;
             uint16_t l;
 
             if (s != e) {

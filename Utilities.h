@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#include "Radio.h"
+#include "Radio.hpp"
 #include "Config.h"
 
 // Included for sorting
@@ -1106,7 +1106,7 @@ uint8_t getInterfaceCommandByte(uint8_t index) {
     }
 }
 
-uint32_t getQueueSize(uint8_t index) {
+uint16_t getQueueSize(uint8_t index) {
     switch (index) {
         case 0:
             return CONFIG_QUEUE_0_SIZE;

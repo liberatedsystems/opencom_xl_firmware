@@ -340,7 +340,7 @@ protected:
 
 class sx126x : public RadioInterface {
 public:
-  sx126x(uint8_t index, SPIClass spi, bool tcxo, bool dio2_as_rf_switch, int ss, int sclk, int mosi, int miso, int reset, int
+  sx126x(uint8_t index, SPIClass* spi, bool tcxo, bool dio2_as_rf_switch, int ss, int sclk, int mosi, int miso, int reset, int
           dio0, int busy, int rxen);
 
   int begin();
@@ -432,7 +432,7 @@ private:
 
 private:
   SPISettings _spiSettings;
-  SPIClass _spiModem;
+  SPIClass* _spiModem;
   int _ss;
   int _sclk;
   int _mosi;
@@ -461,7 +461,7 @@ private:
 
 class sx127x : public RadioInterface {
 public:
-  sx127x(uint8_t index, SPIClass spi, int ss, int sclk, int mosi, int miso, int reset, int dio0, int busy);
+  sx127x(uint8_t index, SPIClass* spi, int ss, int sclk, int mosi, int miso, int reset, int dio0, int busy);
 
   int begin();
   void end();
@@ -536,7 +536,7 @@ private:
 
 private:
   SPISettings _spiSettings;
-  SPIClass _spiModem;
+  SPIClass* _spiModem;
   int _ss;
   int _sclk;
   int _mosi;
@@ -555,7 +555,7 @@ private:
 
 class sx128x : public RadioInterface {
 public:
-  sx128x(uint8_t index, SPIClass spi, bool tcxo, int ss, int sclk, int mosi, int miso, int reset, int dio0, int busy, int rxen, int txen);
+  sx128x(uint8_t index, SPIClass* spi, bool tcxo, int ss, int sclk, int mosi, int miso, int reset, int dio0, int busy, int rxen, int txen);
 
   int begin();
   void end();
@@ -643,7 +643,7 @@ private:
 
 private:
   SPISettings _spiSettings;
-  SPIClass _spiModem;
+  SPIClass* _spiModem;
   int _ss;
   int _sclk;
   int _mosi;
