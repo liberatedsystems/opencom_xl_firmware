@@ -719,8 +719,8 @@ void serialCallback(uint8_t sbyte) {
             if (op_mode == MODE_HOST) selected_radio->setSignalBandwidth(bw);
             selected_radio->updateBitrate();
             sort_interfaces();
-            kiss_indicate_phy_stats(selected_radio);
             kiss_indicate_bandwidth(selected_radio);
+            kiss_indicate_phy_stats(selected_radio);
           }
           interface = 0;
         }
@@ -749,8 +749,8 @@ void serialCallback(uint8_t sbyte) {
         if (op_mode == MODE_HOST) selected_radio->setSpreadingFactor(sf);
         selected_radio->updateBitrate();
         sort_interfaces();
-        kiss_indicate_phy_stats(selected_radio);
         kiss_indicate_spreadingfactor(selected_radio);
+        kiss_indicate_phy_stats(selected_radio);
       }
       interface = 0;
     } else if (command == CMD_CR) {
@@ -765,8 +765,8 @@ void serialCallback(uint8_t sbyte) {
         if (op_mode == MODE_HOST) selected_radio->setCodingRate4(cr);
         selected_radio->updateBitrate();
         sort_interfaces();
-        kiss_indicate_phy_stats(selected_radio);
         kiss_indicate_codingrate(selected_radio);
+        kiss_indicate_phy_stats(selected_radio);
       }
       interface = 0;
     } else if (command == CMD_IMPLICIT) {
