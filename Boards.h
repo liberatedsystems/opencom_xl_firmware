@@ -639,7 +639,7 @@
       #define HAS_PMU true
       #define HAS_NP false
       #define HAS_SD false
-      #define CONFIG_UART_BUFFER_SIZE 6144
+      #define CONFIG_UART_BUFFER_SIZE 40000
       #define CONFIG_QUEUE_0_SIZE 6144
       #define CONFIG_QUEUE_1_SIZE 20000
       #define CONFIG_QUEUE_MAX_LENGTH 200
@@ -665,7 +665,8 @@
 
       #define INTERFACE_COUNT 2
 
-      #define CONFIG_QUEUE_1_SIZE 20000
+      #define CONFIG_QUEUE_1_SIZE 40000
+
       // first interface in list is the primary
       const uint8_t interfaces[INTERFACE_COUNT] = {SX126X, SX128X};
       const bool interface_cfg[INTERFACE_COUNT][3] = { 
