@@ -324,6 +324,7 @@ inline void kiss_write_packet(int index) {
   }
   serial_write(FEND);
   read_len = 0;
+  packet_ready = false;
 }
 
 inline void getPacketData(RadioInterface* radio, uint16_t len) {
@@ -362,7 +363,7 @@ void receive_callback(uint8_t index, int packet_size) {
       getPacketData(selected_radio, packet_size);
 
       seq = SEQ_UNSET;
-      ready = true;
+      packet_ready = true;
 
     } else if (isSplitPacket(header) && seq != sequence) {
       // This split packet does not carry the
@@ -387,7 +388,7 @@ void receive_callback(uint8_t index, int packet_size) {
       }
 
       getPacketData(selected_radio, packet_size);
-      ready = true;
+      packet_ready = true;
     }
   } else {
     // In promiscuous mode, raw packets are
@@ -395,26 +396,9 @@ void receive_callback(uint8_t index, int packet_size) {
     read_len = 0;
 
     getPacketData(selected_radio, packet_size);
-    ready = true;
+    packet_ready = true;
   }
 
-  if (ready) {
-        #if MCU_VARIANT == MCU_ESP32
-        portENTER_CRITICAL(&update_lock);
-        #elif MCU_VARIANT == MCU_NRF52
-        portENTER_CRITICAL();
-        #endif
-        last_rssi = selected_radio->packetRssi();
-        last_snr_raw = selected_radio->packetSnrRaw();
-        #if MCU_VARIANT == MCU_ESP32
-        portEXIT_CRITICAL(&update_lock);
-        #elif MCU_VARIANT == MCU_NRF52
-        portEXIT_CRITICAL();
-        #endif
-        kiss_indicate_stat_rssi();
-        kiss_indicate_stat_snr();
-        kiss_write_packet(index);
-  }
   last_rx = millis();
 }
 
@@ -1190,7 +1174,23 @@ void validate_status() {
 }
 
 void loop() {
-      packet_poll();
+  if (packet_ready) {
+        #if MCU_VARIANT == MCU_ESP32
+        portENTER_CRITICAL(&update_lock);
+        #elif MCU_VARIANT == MCU_NRF52
+        portENTER_CRITICAL();
+        #endif
+        last_rssi = selected_radio->packetRssi();
+        last_snr_raw = selected_radio->packetSnrRaw();
+        #if MCU_VARIANT == MCU_ESP32
+        portEXIT_CRITICAL(&update_lock);
+        #elif MCU_VARIANT == MCU_NRF52
+        portEXIT_CRITICAL();
+        #endif
+        kiss_indicate_stat_rssi();
+        kiss_indicate_stat_snr();
+        kiss_write_packet(1);
+  }
 
     bool ready = false;
     for (int i = 0; i < INTERFACE_COUNT; i++) {
@@ -1325,25 +1325,6 @@ void button_event(uint8_t event, unsigned long duration) {
 
 void poll_buffers() {
     process_serial();
-}
-
-void packet_poll() {
-    // If we have received a packet on an interface which needs to be processed
-    while (!fifo_isempty(&packet_rdy_interfaces)) {
-        #if MCU_VARIANT == MCU_ESP32
-        portENTER_CRITICAL(&update_lock);
-        #elif MCU_VARIANT == MCU_NRF52
-        portENTER_CRITICAL();
-        #endif
-        uint8_t packet_int = fifo_pop(&packet_rdy_interfaces);
-        #if MCU_VARIANT == MCU_ESP32
-        portEXIT_CRITICAL(&update_lock);
-        #elif MCU_VARIANT == MCU_NRF52
-        portEXIT_CRITICAL();
-        #endif
-        selected_radio = interface_obj[packet_int];
-        selected_radio->handleDio0Rise();
-    }
 }
 
 volatile bool serial_polling = false;
