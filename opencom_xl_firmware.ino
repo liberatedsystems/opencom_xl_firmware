@@ -17,8 +17,9 @@
 #include <SPI.h>
 #include "Utilities.h"
 
-#if MCU_VARIANT == MCU_NRF52 
-        #define INTERFACE_SPI
+#if MCU_VARIANT == MCU_NRF52
+  #define INTERFACE_SPI
+  #if BOARD_MODEL == BOARD_RAK4631 
         // Required because on RAK4631, non-default SPI pins must be initialised when class is declared.
       SPIClass interface_spi[1] = {
             // SX1262
@@ -29,6 +30,17 @@
                 interface_pins[0][2]
                )
       };
+  #elif BOARD_MODEL == BOARD_TECHO
+    SPIClass interface_spi[1] = {
+            // SX1262
+            SPIClass(
+                NRF_SPIM3, 
+                interface_pins[0][3], 
+                interface_pins[0][1], 
+                interface_pins[0][2]
+               )
+      };
+  #endif
 #endif
 
 #ifndef INTERFACE_SPI
@@ -363,6 +375,7 @@ void receive_callback(uint8_t index, int packet_size) {
       getPacketData(selected_radio, packet_size);
 
       seq = SEQ_UNSET;
+      packet_interface = index;
       packet_ready = true;
 
     } else if (isSplitPacket(header) && seq != sequence) {
@@ -388,6 +401,8 @@ void receive_callback(uint8_t index, int packet_size) {
       }
 
       getPacketData(selected_radio, packet_size);
+
+      packet_interface = index;
       packet_ready = true;
     }
   } else {
@@ -396,6 +411,8 @@ void receive_callback(uint8_t index, int packet_size) {
     read_len = 0;
 
     getPacketData(selected_radio, packet_size);
+
+    packet_interface = index;
     packet_ready = true;
   }
 
@@ -1118,11 +1135,11 @@ void validate_status() {
         if (eeprom_checksum_valid()) {
           eeprom_ok = true;
           if (modems_installed) {
-              if (device_init()) {
-                hw_ready = true;
-              } else {
-                hw_ready = false;
-              }
+            if (device_init()) {
+              hw_ready = true;
+            } else {
+              hw_ready = false;
+            }
           } else {
             hw_ready = false;
             Serial.write("No valid radio module found\r\n");
@@ -1189,7 +1206,7 @@ void loop() {
         #endif
         kiss_indicate_stat_rssi();
         kiss_indicate_stat_snr();
-        kiss_write_packet(1);
+        kiss_write_packet(packet_interface);
   }
 
     bool ready = false;

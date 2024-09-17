@@ -231,14 +231,12 @@ void device_validate_partitions() {
   // todo, add bootloader, partition table, or softdevice?
   calculate_region_hash(APPLICATION_START, APPLICATION_START+get_fw_length(), dev_firmware_hash);
   #endif
-  #if VALIDATE_FIRMWARE
     for (uint8_t i = 0; i < DEV_HASH_LEN; i++) {
       if (dev_firmware_hash_target[i] != dev_firmware_hash[i]) {
         fw_signature_validated = false;
         break;
       }
     }
-  #endif
 }
 
 bool device_firmware_ok() {
@@ -247,6 +245,7 @@ bool device_firmware_ok() {
 
 #if MCU_VARIANT == MCU_ESP32 || MCU_VARIANT == MCU_NRF52
 bool device_init() {
+  #if VALIDATE_FIRMWARE
   if (bt_ready) {
     #if MCU_VARIANT == MCU_ESP32
     for (uint8_t i=0; i<EEPROM_SIG_LEN; i++){dev_eeprom_signature[i]=EEPROM.read(eeprom_addr(ADDR_SIGNATURE+i));}
@@ -282,9 +281,9 @@ bool device_init() {
 
     hash.end(dev_hash);
     #endif
+
     device_load_signature();
     device_validate_signature();
-
     device_validate_partitions();
 
     #if MCU_VARIANT == MCU_NRF52
@@ -295,5 +294,9 @@ bool device_init() {
   } else {
     return false;
   }
+  #else
+  // Skip hash comparison and checking BT
+  return true;
+  #endif
 }
 #endif
