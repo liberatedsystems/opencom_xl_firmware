@@ -1316,9 +1316,15 @@ void process_serial() {
 #if HAS_INPUT
 void button_event(uint8_t event, unsigned long duration) {
   if (duration > BUTTON_MIN_DURATION) {
+      if (duration > BUTTON_6S_DURATION) {
+        bt_stop();
+      } else if (duration > BUTTON_3S_DURATION) {
+        bt_enable_pairing();
+      } else {
     #if HAS_BUZZER_CTRL
         toggle_buzzer_enable();
     #endif
+      }
   }
 }
 #endif
