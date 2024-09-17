@@ -379,9 +379,9 @@ release-genericesp32:
 	rm -r build
 
 release-freenode:
-	arduino-cli compile --fqbn rakwireless:nrf52:WisCoreRAK4631Board -e --build-property "build.partitions=no_ota" --build-property "upload.maximum_size=2097152" --build-property "compiler.cpp.extra_flags=\"-DBOARD_MODEL=0x51\""
+	arduino-cli compile --fqbn rakwireless:nrf52:WisCoreRAK4631Board -e --build-property "build.partitions=no_ota" --build-property "upload.maximum_size=2097152" --build-property "compiler.cpp.extra_flags=\"-DBOARD_MODEL=0x52\" \"-DBOARD_VARIANT=0x21\""
 	cp build/rakwireless.nrf52.WisCoreRAK4631Board/opencom_xl_firmware.ino.hex build/opencom_xl_firmware.hex
-	adafruit-nrfutil dfu genpkg --dev-type 0x0052 --application build/opencom_xl_firmware.hex Release/opencom_xl_firmware.zip
+	adafruit-nrfutil dfu genpkg --dev-type 0x0052 --application build/opencom_xl_firmware.hex Release/rnode_firmware_opencom_xl.zip
 
 release-rak4631:
 	arduino-cli compile --fqbn rakwireless:nrf52:WisCoreRAK4631Board -e --build-property "build.partitions=no_ota" --build-property "upload.maximum_size=2097152" --build-property "compiler.cpp.extra_flags=\"-DBOARD_MODEL=0x51\" \"-DBOARD_VARIANT=0x12\""
