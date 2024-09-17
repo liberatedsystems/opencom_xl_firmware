@@ -32,6 +32,7 @@
   BLEUart SerialBT;
   BLEDis  bledis;
   BLEBas  blebas;
+  bool SerialBT_init = false;
 #endif
 
 #define BT_PAIRING_TIMEOUT 35000
@@ -379,10 +380,14 @@ void bt_start() {
     // start device information service
     bledis.begin();
 
-    SerialBT.bufferTXD(true); // enable buffering
+    if (!SerialBT_init) {
 
-    SerialBT.setPermission(SECMODE_ENC_WITH_MITM, SECMODE_ENC_WITH_MITM); // enable encryption for BLE serial
-    SerialBT.begin();
+        SerialBT.bufferTXD(true); // enable buffering
+
+        SerialBT.setPermission(SECMODE_ENC_WITH_MITM, SECMODE_ENC_WITH_MITM); // enable encryption for BLE serial
+        SerialBT.begin();
+        SerialBT_init = true;
+    }
 
     blebas.begin();
 
