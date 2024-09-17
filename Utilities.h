@@ -228,7 +228,6 @@ uint8_t boot_vector = 0x00;
 		void led_tx_on()  { digitalWrite(pin_led_tx, HIGH); }
 		void led_tx_off() { digitalWrite(pin_led_tx, LOW); }
 	#endif
->>>>>>> upstream/master
 #endif
 
 void hard_reset(void) {
