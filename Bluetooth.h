@@ -361,7 +361,7 @@ bool bt_setup_hw() {
       #endif
       unsigned char *hash = MD5::make_hash(data, BT_DEV_ADDR_LEN);
       memcpy(bt_dh, hash, BT_DEV_HASH_LEN);
-      sprintf(bt_devname, "RNode %02X%02X", bt_dh[14], bt_dh[15]);
+      sprintf(bt_devname, "openCom XL %02X%02X", bt_dh[14], bt_dh[15]);
       free(data);
 
       bt_ready = true;
