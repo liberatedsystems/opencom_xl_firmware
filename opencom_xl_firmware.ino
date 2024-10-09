@@ -329,7 +329,9 @@ inline void kiss_write_packet(int index) {
   serial_write(cmd_byte);
 
   for (uint16_t i = 0; i < read_len; i++) {
+      portENTER_CRITICAL();
     uint8_t byte = pbuf[i];
+    portEXIT_CRITICAL();
     if (byte == FEND) { serial_write(FESC); byte = TFEND; }
     if (byte == FESC) { serial_write(FESC); byte = TFESC; }
     serial_write(byte);
@@ -340,9 +342,11 @@ inline void kiss_write_packet(int index) {
 }
 
 inline void getPacketData(RadioInterface* radio, uint16_t len) {
+    BaseType_t mask = taskENTER_CRITICAL_FROM_ISR();
   while (len-- && read_len < MTU) {
     pbuf[read_len++] = radio->read();
   }
+    taskEXIT_CRITICAL_FROM_ISR(mask);
 }
 
 void receive_callback(uint8_t index, int packet_size) {
@@ -362,8 +366,10 @@ void receive_callback(uint8_t index, int packet_size) {
       // This is the first part of a split
       // packet, so we set the seq variable
       // and add the data to the buffer
+      BaseType_t mask = taskENTER_CRITICAL_FROM_ISR();
       read_len = 0;
       seq = sequence;
+      taskEXIT_CRITICAL_FROM_ISR(mask);
 
       getPacketData(selected_radio, packet_size);
 
@@ -383,8 +389,10 @@ void receive_callback(uint8_t index, int packet_size) {
       // same sequence id, so we must assume
       // that we are seeing the first part of
       // a new split packet.
+      BaseType_t mask = taskENTER_CRITICAL_FROM_ISR();
       read_len = 0;
       seq = sequence;
+      taskEXIT_CRITICAL_FROM_ISR(mask);
 
       getPacketData(selected_radio, packet_size);
 
@@ -396,8 +404,10 @@ void receive_callback(uint8_t index, int packet_size) {
       if (seq != SEQ_UNSET) {
         // If we already had part of a split
         // packet in the buffer, we clear it.
-        read_len = 0;
+      BaseType_t mask = taskENTER_CRITICAL_FROM_ISR();
+      read_len = 0;
         seq = SEQ_UNSET;
+      taskEXIT_CRITICAL_FROM_ISR(mask);
       }
 
       getPacketData(selected_radio, packet_size);
@@ -408,7 +418,9 @@ void receive_callback(uint8_t index, int packet_size) {
   } else {
     // In promiscuous mode, raw packets are
     // output directly to the host
-    read_len = 0;
+      BaseType_t mask = taskENTER_CRITICAL_FROM_ISR();
+      read_len = 0;
+      taskEXIT_CRITICAL_FROM_ISR(mask);
 
     getPacketData(selected_radio, packet_size);
 
