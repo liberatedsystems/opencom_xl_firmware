@@ -119,7 +119,7 @@ sx126x::sx126x(uint8_t index, SPIClass* spi, bool tcxo, bool dio2_as_rf_switch, 
   RadioInterface(index),
     _spiSettings(8E6, MSBFIRST, SPI_MODE0), _spiModem(spi), _ss(ss),
     _sclk(sclk), _mosi(mosi), _miso(miso), _reset(reset), _dio0(dio0),
-    _busy(busy), _rxen(rxen), _frequency(0), _txp(0), _sf(0x07), _bw(0x04),
+    _busy(busy), _rxen(rxen), _frequency(0), _sf(0x07), _bw(0x04),
     _cr(0x01), _ldro(0x00), _packetIndex(0), _implicitHeaderMode(0),
     _payloadLength(255), _crcMode(1), _fifo_tx_addr_ptr(0),
     _fifo_rx_addr_ptr(0), _preinit_done(false), _tcxo(tcxo),
@@ -129,7 +129,7 @@ sx126x::sx126x(uint8_t index, SPIClass* spi, bool tcxo, bool dio2_as_rf_switch, 
   setTimeout(0);
   // TODO, figure out why this has to be done. Using the index to reference the
   // interface_obj list causes a crash otherwise
-  _index = getIndex();
+  //_index = getIndex();
 }
 
 bool sx126x::preInit() {
@@ -488,34 +488,34 @@ int sx126x::beginPacket(int implicitHeader)
 
 int sx126x::endPacket()
 {
-      setPacketParams(_preambleLength, _implicitHeaderMode, _payloadLength, _crcMode);
+    setPacketParams(_preambleLength, _implicitHeaderMode, _payloadLength, _crcMode);
 
-      // put in single TX mode
-      uint8_t timeout[3] = {0};
-      executeOpcode(OP_TX_6X, timeout, 3);
+    // put in single TX mode
+    uint8_t timeout[3] = {0};
+    executeOpcode(OP_TX_6X, timeout, 3);
 
-      uint8_t buf[2];
+    uint8_t buf[2];
 
-      buf[0] = 0x00;
-      buf[1] = 0x00;
+    buf[0] = 0x00;
+    buf[1] = 0x00;
 
-      executeOpcodeRead(OP_GET_IRQ_STATUS_6X, buf, 2);
+    executeOpcodeRead(OP_GET_IRQ_STATUS_6X, buf, 2);
 
-      // wait for TX done
-      while ((buf[1] & IRQ_TX_DONE_MASK_6X) == 0) {
+    // wait for TX done
+    while ((buf[1] & IRQ_TX_DONE_MASK_6X) == 0) {
         buf[0] = 0x00;
         buf[1] = 0x00;
         executeOpcodeRead(OP_GET_IRQ_STATUS_6X, buf, 2);
         yield();
-      }
+    }
 
-      // clear IRQ's
+    // clear IRQ's
 
-      uint8_t mask[2];
-      mask[0] = 0x00;
-      mask[1] = IRQ_TX_DONE_MASK_6X;
-      executeOpcode(OP_CLEAR_IRQ_STATUS_6X, mask, 2);
-  return 1;
+    uint8_t mask[2];
+    mask[0] = 0x00;
+    mask[1] = IRQ_TX_DONE_MASK_6X;
+    executeOpcode(OP_CLEAR_IRQ_STATUS_6X, mask, 2);
+    return 1;
 }
 
 uint8_t sx126x::modemStatus() {
@@ -561,7 +561,7 @@ uint8_t sx126x::packetRssiRaw() {
     return buf[2];
 }
 
-int ISR_VECT sx126x::packetRssi() {
+int ISR_VECT sx126x::packetRssi(uint8_t pkt_snr_raw) {
     // may need more calculations here
     uint8_t buf[3] = {0};
     executeOpcodeRead(OP_PACKET_STATUS_6X, buf, 3);
@@ -740,13 +740,17 @@ void sx126x::sleep()
 
 void sx126x::enableTCXO() {
   if (_tcxo) {
-    #if BOARD_MODEL == BOARD_FREENODE || BOARD_MODEL == BOARD_HELTEC32_V3
+    #if BOARD_MODEL == BOARD_OPENCOM_XL || BOARD_MODEL == BOARD_HELTEC32_V3
       uint8_t buf[4] = {MODE_TCXO_3_3V_6X, 0x00, 0x00, 0xFF};
     #elif BOARD_MODEL == BOARD_TBEAM
       uint8_t buf[4] = {MODE_TCXO_1_8V_6X, 0x00, 0x00, 0xFF};
     #elif BOARD_MODEL == BOARD_TECHO
       uint8_t buf[4] = {MODE_TCXO_1_8V_6X, 0x00, 0x00, 0xFF};
     #elif BOARD_MODEL == BOARD_T3S3
+      uint8_t buf[4] = {MODE_TCXO_1_8V_6X, 0x00, 0x00, 0xFF};
+    #elif BOARD_MODEL == BOARD_TDECK
+      uint8_t buf[4] = {MODE_TCXO_1_8V_6X, 0x00, 0x00, 0xFF};
+    #elif BOARD_MODEL == BOARD_TBEAM_S_V1
       uint8_t buf[4] = {MODE_TCXO_1_8V_6X, 0x00, 0x00, 0xFF};
     #else
       uint8_t buf[4] = {0};
@@ -789,7 +793,7 @@ void sx126x::setTxPower(int level, int outputPin) {
     executeOpcode(OP_TX_PARAMS_6X, tx_buf, 2);
 }
 
-uint8_t sx126x::getTxPower() {
+int8_t sx126x::getTxPower() {
     return _txp;
 }
 
@@ -995,7 +999,9 @@ void sx126x::updateBitrate() {
         _lora_symbol_time_ms = (1.0/_lora_symbol_rate)*1000.0;
         _bitrate = (uint32_t)(_sf * ( (4.0/(float)(_cr+4)) / ((float)(pow(2, _sf))/((float)getSignalBandwidth()/1000.0)) ) * 1000.0);
         _lora_us_per_byte = 1000000.0/((float)_bitrate/8.0);
-        //_csma_slot_ms = _lora_symbol_time_ms*10;
+        _csma_slot_ms = _lora_symbol_time_ms*12;
+        if (_csma_slot_ms > CSMA_SLOT_MAX_MS) { _csma_slot_ms = CSMA_SLOT_MAX_MS; }
+        if (_csma_slot_ms < CSMA_SLOT_MIN_MS) { _csma_slot_ms = CSMA_SLOT_MIN_MS; }
         float target_preamble_symbols = (LORA_PREAMBLE_TARGET_MS/_lora_symbol_time_ms)-LORA_PREAMBLE_SYMBOLS_HW;
         if (target_preamble_symbols < LORA_PREAMBLE_SYMBOLS_MIN) {
             target_preamble_symbols = LORA_PREAMBLE_SYMBOLS_MIN;
@@ -1092,7 +1098,7 @@ sx127x::sx127x(uint8_t index, SPIClass* spi, int ss, int sclk, int mosi, int mis
     setTimeout(0); 
     // TODO, figure out why this has to be done. Using the index to reference the
     // interface_obj list causes a crash otherwise
-    _index = getIndex();
+    //_index = getIndex();
 }
 
 void sx127x::setSPIFrequency(uint32_t frequency) { _spiSettings = SPISettings(frequency, MSBFIRST, SPI_MODE0); }
@@ -1246,22 +1252,26 @@ uint8_t sx127x::packetRssiRaw() {
     return pkt_rssi_value;
 }
 
-int ISR_VECT sx127x::packetRssi() {
-    int pkt_rssi = (int)readRegister(REG_PKT_RSSI_VALUE_7X) - RSSI_OFFSET;
-    int pkt_snr = packetSnr();
-
-    if (_frequency < 820E6) pkt_rssi -= 7;
-
-    if (pkt_snr < 0) {
-        pkt_rssi += pkt_snr;
-    } else {
-        // Slope correction is (16/15)*pkt_rssi,
-        // this estimation looses one floating point
-        // operation, and should be precise enough.
-        pkt_rssi = (int)(1.066 * pkt_rssi);
-    }
-    return pkt_rssi;
+int ISR_VECT sx127x::packetRssi(uint8_t pkt_snr_raw) {
+  int pkt_rssi = (int)readRegister(REG_PKT_RSSI_VALUE_7X) - RSSI_OFFSET;
+  int pkt_snr;
+  if (pkt_snr_raw == 0xFF) {
+      pkt_snr = packetSnr();
+  } else {
+      pkt_snr = ((int8_t)pkt_snr_raw)*0.25;
+  }
+  if (_frequency < 820E6) pkt_rssi -= 7;
+  if (pkt_snr < 0) {
+      pkt_rssi += pkt_snr;
+  } else {
+      // Slope correction is (16/15)*pkt_rssi,
+      // this estimation looses one floating point
+      // operation, and should be precise enough.
+      pkt_rssi = (int)(1.066 * pkt_rssi);
+  }
+  return pkt_rssi;
 }
+
 
 uint8_t ISR_VECT sx127x::packetSnrRaw() {
     return readRegister(REG_PKT_SNR_VALUE_7X);
@@ -1374,9 +1384,10 @@ void sx127x::setTxPower(int level, int outputPin) {
     writeRegister(REG_PA_DAC_7X, 0x84);
     writeRegister(REG_PA_CONFIG_7X, PA_BOOST_7X | (level - 2));
   }
+  _txp = level;
 }
 
-uint8_t sx127x::getTxPower() { byte txp = readRegister(REG_PA_CONFIG_7X); return txp; }
+int8_t sx127x::getTxPower() { return _txp; }
 
 void sx127x::setFrequency(uint32_t frequency) {
   _frequency = frequency;
@@ -1531,7 +1542,9 @@ void sx127x::updateBitrate() {
         _lora_symbol_time_ms = (1.0/_lora_symbol_rate)*1000.0;
         _bitrate = (uint32_t)(_sf * ( (4.0/(float)(_cr+4)) / ((float)(pow(2, _sf))/((float)getSignalBandwidth()/1000.0)) ) * 1000.0);
         _lora_us_per_byte = 1000000.0/((float)_bitrate/8.0);
-        //_csma_slot_ms = _lora_symbol_time_ms*10;
+        _csma_slot_ms = _lora_symbol_time_ms*12;
+        if (_csma_slot_ms > CSMA_SLOT_MAX_MS) { _csma_slot_ms = CSMA_SLOT_MAX_MS; }
+        if (_csma_slot_ms < CSMA_SLOT_MIN_MS) { _csma_slot_ms = CSMA_SLOT_MIN_MS; }
         float target_preamble_symbols = (LORA_PREAMBLE_TARGET_MS/_lora_symbol_time_ms)-LORA_PREAMBLE_SYMBOLS_HW;
         if (target_preamble_symbols < LORA_PREAMBLE_SYMBOLS_MIN) {
             target_preamble_symbols = LORA_PREAMBLE_SYMBOLS_MIN;
@@ -1605,7 +1618,7 @@ sx128x::sx128x(uint8_t index, SPIClass* spi, bool tcxo, int ss, int sclk, int mo
     _spiSettings(8E6, MSBFIRST, SPI_MODE0),
     _spiModem(spi),
   _ss(ss), _sclk(sclk), _mosi(mosi), _miso(miso), _reset(reset), _dio0(dio0),
-  _busy(busy), _rxen(rxen), _txen(txen), _frequency(0), _txp(0), _sf(0x05),
+  _busy(busy), _rxen(rxen), _txen(txen), _frequency(0), _sf(0x05),
   _bw(0x34), _cr(0x01), _packetIndex(0), _implicitHeaderMode(0),
   _payloadLength(255), _crcMode(0), _fifo_tx_addr_ptr(0), _fifo_rx_addr_ptr(0),
   _rxPacketLength(0), _preinit_done(false),
@@ -1615,7 +1628,7 @@ sx128x::sx128x(uint8_t index, SPIClass* spi, bool tcxo, int ss, int sclk, int mo
   setTimeout(0);
   // TODO, figure out why this has to be done. Using the index to reference the
   // interface_obj list causes a crash otherwise
-  _index = getIndex();
+  //_index = getIndex();
 }
 
 bool sx128x::preInit() {
@@ -2028,7 +2041,7 @@ uint8_t sx128x::packetRssiRaw() {
     return buf[0];
 }
 
-int ISR_VECT sx128x::packetRssi() {
+int ISR_VECT sx128x::packetRssi(uint8_t pkt_snr_raw) {
     // may need more calculations here
     uint8_t buf[5] = {0};
     executeOpcodeRead(OP_PACKET_STATUS_8X, buf, 5);
@@ -2333,7 +2346,7 @@ void sx128x::setTxPower(int level, int outputPin) {
 
     executeOpcode(OP_TX_PARAMS_8X, tx_buf, 2);
 
-    #elif BOARD_VARIANT == MODEL_A5
+    #elif BOARD_VARIANT == MODEL_AB
     // T3S3 SX1280 PA
         if (level > 20) {
             level = 20;
@@ -2414,7 +2427,7 @@ void sx128x::setTxPower(int level, int outputPin) {
                 break;
         }
 
-        tx_buf[0] = reg_value + 18;
+        tx_buf[0] = reg_value;
         tx_buf[1] = 0xE0; // ramping time - 20 microseconds
     #else
     // For SX1280 boards with no specific PA requirements
@@ -2432,7 +2445,7 @@ void sx128x::setTxPower(int level, int outputPin) {
     executeOpcode(OP_TX_PARAMS_8X, tx_buf, 2);
 }
 
-uint8_t sx128x::getTxPower() {
+int8_t sx128x::getTxPower() {
       return _txp;
 }
 
@@ -2625,14 +2638,16 @@ void sx128x::updateBitrate() {
         _lora_symbol_time_ms = (1.0/_lora_symbol_rate)*1000.0;
         _bitrate = (uint32_t)(_sf * ( (4.0/(float)(_cr+4)) / ((float)(pow(2, _sf))/((float)getSignalBandwidth()/1000.0)) ) * 1000.0);
         _lora_us_per_byte = 1000000.0/((float)_bitrate/8.0);
-        _csma_slot_ms = 10;
+        _csma_slot_ms = _lora_symbol_time_ms*12;
+        if (_csma_slot_ms > CSMA_SLOT_MAX_MS) { _csma_slot_ms = CSMA_SLOT_MAX_MS; }
+        if (_csma_slot_ms < CSMA_SLOT_MIN_MS) { _csma_slot_ms = CSMA_SLOT_MIN_MS; }
 
         float target_preamble_symbols;
-        //if (_bitrate <= LORA_FAST_BITRATE_THRESHOLD) {
+        if (_bitrate <= LORA_FAST_BITRATE_THRESHOLD) {
             target_preamble_symbols = (LORA_PREAMBLE_TARGET_MS/_lora_symbol_time_ms)-LORA_PREAMBLE_SYMBOLS_HW;
-        //} else {
-            /*target_preamble_symbols = (LORA_PREAMBLE_FAST_TARGET_MS/_lora_symbol_time_ms)-LORA_PREAMBLE_SYMBOLS_HW;
-        }*/
+        } else {
+            target_preamble_symbols = (LORA_PREAMBLE_FAST_TARGET_MS/_lora_symbol_time_ms)-LORA_PREAMBLE_SYMBOLS_HW;
+        }
         if (target_preamble_symbols < LORA_PREAMBLE_SYMBOLS_MIN) {
             target_preamble_symbols = LORA_PREAMBLE_SYMBOLS_MIN;
         } else {

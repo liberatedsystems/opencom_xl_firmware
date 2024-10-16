@@ -1,4 +1,4 @@
-// Copyright (C) 2023, Mark Qvist
+// Copyright (C) 2024, Mark Qvist
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -296,7 +296,8 @@ bool device_init() {
   }
   #else
   // Skip hash comparison and checking BT
-  return true;
+  device_init_done = true;
+  return device_init_done;
   #endif
 }
 #endif
