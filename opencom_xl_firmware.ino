@@ -1334,6 +1334,7 @@ void validate_status() {
     #endif
     led_indicate_boot_error();
   }
+  Scheduler.startLoop(input_read);
 }
 
 void loop() {
@@ -1462,10 +1463,6 @@ void loop() {
 
   #if HAS_BLUETOOTH || HAS_BLE == true
     if (!console_active && bt_ready) update_bt();
-  #endif
-
-  #if HAS_INPUT
-    input_read();
   #endif
 
   #if HAS_BUZZER
