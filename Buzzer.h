@@ -33,6 +33,7 @@
 
     void toggle_buzzer_enable() {
         buzzer_enabled = !buzzer_enabled;
-        update_buzzer_notone();
+        noTone(PIN_BUZZER);
+        digitalWrite(PIN_BUZZER, LOW);
     }
 #endif
