@@ -243,10 +243,10 @@ uint8_t boot_vector = 0x00;
 	#endif
 #elif MCU_VARIANT == MCU_NRF52
     #if BOARD_MODEL == BOARD_OPENCOM_XL
-		void led_rx_on()  { digitalWrite(pin_led_rx, 1); }
-		void led_rx_off() {	digitalWrite(pin_led_rx, 0); }
-		void led_tx_on()  { digitalWrite(pin_led_tx, 1); }
-		void led_tx_off() { digitalWrite(pin_led_tx, 0); }
+		void led_rx_on()  { analogWrite(pin_led_rx, 1); }
+		void led_rx_off() {	analogWrite(pin_led_rx, 0); }
+		void led_tx_on()  { analogWrite(pin_led_tx, 1); }
+		void led_tx_off() { analogWrite(pin_led_tx, 0); }
     #endif
     #if BOARD_MODEL == BOARD_RAK4631
 		void led_rx_on()  { digitalWrite(pin_led_rx, HIGH); }
