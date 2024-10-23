@@ -22,6 +22,7 @@
   #define BUTTON_MIN_DURATION 50
   #define BUTTON_3S_DURATION 3000
   #define BUTTON_6S_DURATION 6000
+  #define BUTTON_9S_DURATION 9000
 
   #define EVENT_ALL                 0x00
   #define EVENT_CLICKS              0x01

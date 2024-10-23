@@ -371,6 +371,12 @@ char bt_devname[11];
 #elif MCU_VARIANT == MCU_NRF52
   uint8_t eeprom_read(uint32_t mapped_addr);
 
+  void bt_bond_wipe() {
+      // Delete all bonding data
+      Bluefruit.Periph.clearBonds();
+      led_indicate_info(2);
+  }
+
   void bt_stop() {
     if (bt_state != BT_STATE_OFF) {
       bt_allow_pairing = false;

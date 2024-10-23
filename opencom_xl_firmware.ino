@@ -1489,7 +1489,9 @@ void process_serial() {
 #if HAS_INPUT
 void button_event(uint8_t event, unsigned long duration) {
   if (duration > BUTTON_MIN_DURATION) {
-      if (duration > BUTTON_6S_DURATION) {
+      if (duration > BUTTON_9S_DURATION) {
+        bt_bond_wipe();
+      } else if (duration > BUTTON_6S_DURATION) {
         bt_stop();
         bt_conf_save(false);
       } else if (duration > BUTTON_3S_DURATION) {
