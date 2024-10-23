@@ -247,8 +247,7 @@ uint8_t boot_vector = 0x00;
 		void led_rx_off() {	analogWrite(pin_led_rx, 0); }
 		void led_tx_on()  { analogWrite(pin_led_tx, 1); }
 		void led_tx_off() { analogWrite(pin_led_tx, 0); }
-    #endif
-    #if BOARD_MODEL == BOARD_RAK4631
+    #elif BOARD_MODEL == BOARD_RAK4631
 		void led_rx_on()  { digitalWrite(pin_led_rx, HIGH); }
 		void led_rx_off() {	digitalWrite(pin_led_rx, LOW); }
 		void led_tx_on()  { digitalWrite(pin_led_tx, HIGH); }
@@ -1060,7 +1059,7 @@ void setTXPower(RadioInterface* radio, int txp) {
     if (model == MODEL_A8) radio->setTxPower(txp, PA_OUTPUT_PA_BOOST_PIN);
     if (model == MODEL_A9) radio->setTxPower(txp, PA_OUTPUT_PA_BOOST_PIN);
     if (model == MODEL_AA) radio->setTxPower(txp, PA_OUTPUT_PA_BOOST_PIN);
-    if (model == MODEL_AB) radio->setTxPower(txp, PA_OUTPUT_PA_BOOST_PIN);
+    if (model == MODEL_AC) radio->setTxPower(txp, PA_OUTPUT_PA_BOOST_PIN);
 
     if (model == MODEL_B3) radio->setTxPower(txp, PA_OUTPUT_PA_BOOST_PIN);
     if (model == MODEL_B4) radio->setTxPower(txp, PA_OUTPUT_PA_BOOST_PIN);
@@ -1438,6 +1437,8 @@ bool eeprom_model_valid() {
 	if (model == MODEL_C4 || model == MODEL_C9) {
 	#elif BOARD_MODEL == BOARD_HELTEC32_V3
 	if (model == MODEL_C5 || model == MODEL_CA) {
+    #elif BOARD_MODEL == BOARD_RAK4631
+    if (model == MODEL_11 || model == MODEL_12 || model == MODEL_13 || model == MODEL_14) {
     #elif BOARD_MODEL == BOARD_OPENCOM_XL
     if (model == MODEL_21) {
 	#elif BOARD_MODEL == BOARD_HUZZAH32

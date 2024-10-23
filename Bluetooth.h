@@ -29,10 +29,12 @@
 #elif MCU_VARIANT == MCU_NRF52
   #include <bluefruit.h>
   #include <math.h>
-  BLEUart SerialBT;
+  #define BLE_MTU 512+3
+  BLEUart SerialBT(BLE_MTU);
   BLEDis  bledis;
   BLEBas  blebas;
   bool SerialBT_init = false;
+  extern void led_indicate_info(int);
 #endif
 
 #define BT_PAIRING_TIMEOUT 35000
@@ -442,7 +444,7 @@ char bt_devname[11];
     cable_state = CABLE_STATE_DISCONNECTED;
     BLEConnection* conn = Bluefruit.Connection(conn_handle);
     conn->requestPHY(BLE_GAP_PHY_2MBPS);
-    conn->requestMtuExchange(512+3);
+    conn->requestMtuExchange(BLE_MTU);
     conn->requestDataLengthUpdate();
 }
 
@@ -509,10 +511,9 @@ void bt_disconnect_callback(uint16_t conn_handle, uint8_t reason) {
       // start device information service
       bledis.begin();
 
+      // Guard to ensure SerialBT service is not duplicated through BT being power cycled
       if (!SerialBT_init) {
-
           SerialBT.bufferTXD(true); // enable buffering
-
           SerialBT.setPermission(SECMODE_ENC_WITH_MITM, SECMODE_ENC_WITH_MITM); // enable encryption for BLE serial
           SerialBT.begin();
           SerialBT_init = true;
