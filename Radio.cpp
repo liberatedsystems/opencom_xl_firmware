@@ -1623,7 +1623,7 @@ sx128x::sx128x(uint8_t index, SPIClass* spi, bool tcxo, int ss, int sclk, int mo
   _bw(0x34), _cr(0x01), _packetIndex(0), _implicitHeaderMode(0),
   _payloadLength(255), _crcMode(0), _fifo_tx_addr_ptr(0), _fifo_rx_addr_ptr(0),
   _rxPacketLength(0), _preinit_done(false),
-  _tcxo(tcxo)
+  _tcxo(tcxo), _txp_dc(55)
 {
   // overide Stream timeout value
   setTimeout(0);
@@ -1709,7 +1709,11 @@ uint8_t ISR_VECT sx128x::singleTransfer(uint8_t opcode, uint16_t address, uint8_
 void sx128x::rxAntEnable()
 {
     if (_txen != -1) {
+        #if BOARD_VARIANT == MODEL_13 || BOARD_VARIANT == MODEL_21
+        analogWrite(_txen, 0);
+        #else
         digitalWrite(_txen, LOW);
+        #endif
     }
     if (_rxen != -1) {
         digitalWrite(_rxen, HIGH);
@@ -1719,7 +1723,15 @@ void sx128x::rxAntEnable()
 void sx128x::txAntEnable()
 {
     if (_txen != -1) {
+        #if BOARD_VARIANT == MODEL_13 || BOARD_VARIANT == MODEL_21
+        // RAK4631 with WisBlock SX1280 module (LIBSYS002)
+        // This board needs to use a PWM input in order to scale the power of
+        // the PA output. Undocumented by NiceRF, they have been contacted for
+        // comment. (March 2025)
+        analogWrite(_txen, _txp_dc);
+        #else
         digitalWrite(_txen, HIGH);
+        #endif
     }
     if (_rxen != -1) {
         digitalWrite(_rxen, LOW);
@@ -2242,7 +2254,13 @@ void sx128x::disableTCXO() {
 void sx128x::setTxPower(int level, int outputPin) {
     uint8_t tx_buf[2];
     #if BOARD_VARIANT == MODEL_13 || BOARD_VARIANT == MODEL_21
-    // RAK4631 with WisBlock SX1280 module (LIBSYS002)
+    // RAK4631 with WisBlock SX1280 module (LIBSYS002) The following duty cycle
+    // values assume a battery is in use which has a maximum voltage supply of
+    // 4.2v (each case assumes 3.7v, except 15-20dBm to ensure legal compliance
+    // at all battery voltages), as per the specification for the RAK19001.
+    // Higher voltage batteries may cause your device to operate illegally due
+    // to the resulting increase in transmission power. Beware!
+
     if (level > 27) {
         level = 27;
     } else if (level < 0) {
@@ -2256,90 +2274,125 @@ void sx128x::setTxPower(int level, int outputPin) {
     switch (level) {
         case 0:
             reg_value = -18;
+            _txp_dc = 55;
             break;
         case 1:
             reg_value = -16;
+            _txp_dc = 64;
             break;
         case 2:
             reg_value = -15;
+            _txp_dc = 73;
             break;
         case 3:
             reg_value = -14;
+            _txp_dc = 81;
             break;
         case 4:
             reg_value = -13;
+            _txp_dc = 90;
             break;
         case 5:
             reg_value = -12;
+            _txp_dc = 100;
             break;
         case 6:
             reg_value = -11;
+            _txp_dc = 108;
             break;
         case 7:
             reg_value = -9;
+            _txp_dc = 117;
             break;
         case 8:
             reg_value = -8;
+            _txp_dc = 126;
             break;
         case 9:
             reg_value = -7;
+            _txp_dc = 135;
             break;
         case 10:
             reg_value = -6;
+            _txp_dc = 144;
             break;
         case 11:
             reg_value = -5;
+            _txp_dc = 153;
             break;
         case 12:
             reg_value = -4;
+            _txp_dc = 161;
             break;
         case 13:
             reg_value = -3;
+            _txp_dc = 170;
             break;
         case 14:
             reg_value = -2;
+            _txp_dc = 180;
             break;
         case 15:
             reg_value = -1;
+            // Capped to ensure it doesn't exceed 15dBm 
+            _txp_dc = 183;
             break;
         case 16:
             reg_value = 0;
+            // Capped to ensure it doesn't exceed 16dBm 
+            _txp_dc = 190;
             break;
         case 17:
             reg_value = 1;
+            // Capped to ensure it doesn't exceed 17dBm 
+            _txp_dc = 200;
             break;
         case 18:
             reg_value = 2;
+            // Capped to ensure it doesn't exceed 18dBm 
+            _txp_dc = 209;
             break;
         case 19:
             reg_value = 3;
+            // Capped to ensure it doesn't exceed 19dBm 
+            _txp_dc = 218;
             break;
         case 20:
             reg_value = 4;
+            // Capped to ensure it doesn't exceed 20dBm 
+            _txp_dc = 227;
             break;
         case 21:
             reg_value = 5;
+            _txp_dc = 247;
             break;
         case 22:
             reg_value = 6;
+            _txp_dc = 254;
             break;
         case 23:
             reg_value = 7;
+            _txp_dc = 255;
             break;
         case 24:
             reg_value = 8;
+            _txp_dc = 255;
             break;
         case 25:
             reg_value = 9;
+            _txp_dc = 255;
             break;
         case 26:
             reg_value = 12;
+            _txp_dc = 255;
             break;
         case 27:
             reg_value = 13;
+            _txp_dc = 255;
             break;
         default:
-            reg_value = 0;
+            reg_value = -18;
+            _txp_dc = 55;
             break;
     }
 

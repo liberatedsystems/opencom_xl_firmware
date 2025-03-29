@@ -670,5 +670,6 @@ private:
   bool _preinit_done;
   int _rxPacketLength;
   bool _tcxo;
+  uint8_t _txp_dc;
 };
 #endif
