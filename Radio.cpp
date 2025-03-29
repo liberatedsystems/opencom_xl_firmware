@@ -2261,8 +2261,12 @@ void sx128x::setTxPower(int level, int outputPin) {
     // Higher voltage batteries may cause your device to operate illegally due
     // to the resulting increase in transmission power. Beware!
 
-    if (level > 27) {
-        level = 27;
+    // TODO: in the future it may be possible to read the battery voltage and
+    // compensate for the lower voltage causing a lower transmit power. Need to
+    // look into this.
+
+    if (level > 25) {
+        level = 25;
     } else if (level < 0) {
         level = 0;
     }
@@ -2274,93 +2278,93 @@ void sx128x::setTxPower(int level, int outputPin) {
     switch (level) {
         case 0:
             reg_value = -18;
-            _txp_dc = 55;
+            _txp_dc = 131;
             break;
         case 1:
             reg_value = -16;
-            _txp_dc = 64;
+            _txp_dc = 137;
             break;
         case 2:
             reg_value = -15;
-            _txp_dc = 73;
+            _txp_dc = 142;
             break;
         case 3:
             reg_value = -14;
-            _txp_dc = 81;
+            _txp_dc = 148;
             break;
         case 4:
             reg_value = -13;
-            _txp_dc = 90;
+            _txp_dc = 154;
             break;
         case 5:
             reg_value = -12;
-            _txp_dc = 100;
+            _txp_dc = 159;
             break;
         case 6:
             reg_value = -11;
-            _txp_dc = 108;
+            _txp_dc = 163;
             break;
         case 7:
             reg_value = -9;
-            _txp_dc = 117;
+            _txp_dc = 168;
             break;
         case 8:
             reg_value = -8;
-            _txp_dc = 126;
+            _txp_dc = 174;
             break;
         case 9:
             reg_value = -7;
-            _txp_dc = 135;
+            _txp_dc = 178;
             break;
         case 10:
             reg_value = -6;
-            _txp_dc = 144;
+            _txp_dc = 184;
             break;
         case 11:
             reg_value = -5;
-            _txp_dc = 153;
+            _txp_dc = 189;
             break;
         case 12:
             reg_value = -4;
-            _txp_dc = 161;
+            _txp_dc = 194;
             break;
         case 13:
             reg_value = -3;
-            _txp_dc = 170;
+            _txp_dc = 199;
             break;
         case 14:
             reg_value = -2;
-            _txp_dc = 180;
+            _txp_dc = 199;
             break;
         case 15:
             reg_value = -1;
             // Capped to ensure it doesn't exceed 15dBm 
-            _txp_dc = 183;
+            _txp_dc = 202;
             break;
         case 16:
             reg_value = 0;
             // Capped to ensure it doesn't exceed 16dBm 
-            _txp_dc = 190;
+            _txp_dc = 208;
             break;
         case 17:
             reg_value = 1;
             // Capped to ensure it doesn't exceed 17dBm 
-            _txp_dc = 200;
+            _txp_dc = 214;
             break;
         case 18:
             reg_value = 2;
             // Capped to ensure it doesn't exceed 18dBm 
-            _txp_dc = 209;
+            _txp_dc = 222;
             break;
         case 19:
             reg_value = 3;
             // Capped to ensure it doesn't exceed 19dBm 
-            _txp_dc = 218;
+            _txp_dc = 228;
             break;
         case 20:
             reg_value = 4;
             // Capped to ensure it doesn't exceed 20dBm 
-            _txp_dc = 227;
+            _txp_dc = 234;
             break;
         case 21:
             reg_value = 5;
@@ -2392,7 +2396,7 @@ void sx128x::setTxPower(int level, int outputPin) {
             break;
         default:
             reg_value = -18;
-            _txp_dc = 55;
+            _txp_dc = 131;
             break;
     }
 
