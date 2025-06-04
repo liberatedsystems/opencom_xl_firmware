@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// This class is for BLE serial functionality on ESP32 boards ONLY
-
 #include "../../Boards.h"
 
 #if PLATFORM != PLATFORM_NRF52
@@ -80,6 +78,9 @@ public:
 
   void begin(const char *name);
   void end();
+  void disconnect();
+  void startAdvertising();
+  void stopAdvertising();
   void onWrite(BLECharacteristic *characteristic);
   int available();
   int peek();

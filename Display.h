@@ -135,38 +135,41 @@ void busyCallback(const void* p) {
 
 #include "Graphics.h"
 
-#if BOARD_MODEL == BOARD_RAK4631 || BOARD_MODEL == BOARD_OPENCOM_XL
+#if BOARD_MODEL == BOARD_RAK4631 || BOARD_MODEL == BOARD_OPENCOM_XL || BOARD_MODEL == BOARD_H_W_PAPER
   #if DISPLAY == EINK_BW
   GxEPD2_BW<DISPLAY_MODEL, DISPLAY_MODEL::HEIGHT> display(DISPLAY_MODEL(pin_disp_cs, pin_disp_dc, pin_disp_reset, pin_disp_busy));
-  float disp_target_fps = 0.2;
+  float disp_target_fps = 0.5;
   uint32_t last_epd_refresh = 0;
+  uint32_t last_epd_full_refresh = 0;
   #define REFRESH_PERIOD 300000 // 5 minutes in ms
   #elif DISPLAY == EINK_3C
   GxEPD2_3C<DISPLAY_MODEL, DISPLAY_MODEL::HEIGHT> display(DISPLAY_MODEL(pin_disp_cs, pin_disp_dc, pin_disp_reset, pin_disp_busy));
-  float disp_target_fps = 0.05; // refresh usually takes longer on 3C, hence this is 4x the BW refresh period
+  float disp_target_fps = 0.05; // refresh usually takes longer on 3C
   uint32_t last_epd_refresh = 0;
+  uint32_t last_epd_full_refresh = 0;
   #define REFRESH_PERIOD 600000 // 10 minutes in ms
   #endif
 #elif BOARD_MODEL == BOARD_TECHO
 GxEPD2_BW<DISPLAY_MODEL, DISPLAY_MODEL::HEIGHT> display(DISPLAY_MODEL(pin_disp_cs, pin_disp_dc, pin_disp_reset, pin_disp_busy));
 float disp_target_fps = 0.2;
 uint32_t last_epd_refresh = 0;
+uint32_t last_epd_full_refresh = 0;
 #define REFRESH_PERIOD 300000 // 5 minutes in ms
 #else
   #if DISPLAY == OLED
-  #if BOARD_MODEL == BOARD_TDECK
+    Adafruit_SSD1306 display(DISP_W, DISP_H, &Wire, DISP_RST);
+  #elif BOARD_MODEL == BOARD_TDECK
     Adafruit_ST7789 display = Adafruit_ST7789(DISPLAY_CS, DISPLAY_DC, -1);
   #elif BOARD_MODEL == BOARD_TBEAM_S_V1
     Adafruit_SH1106G display = Adafruit_SH1106G(DISP_W, DISP_H, &Wire, -1);
-  #else
-    Adafruit_SSD1306 display(DISP_W, DISP_H, &Wire, DISP_RST);
+  #elif BOARD_MODEL == BOARD_HELTEC_T114
+    ST7789Spi display(&SPI1, DISPLAY_RST, DISPLAY_DC, DISPLAY_CS);
   #endif
   float disp_target_fps = 7;
   #define SCREENSAVER_TIME 500 // ms
   uint32_t last_screensaver = 0;
   #define SCREENSAVER_INTERVAL 600000 // 10 minutes in ms
   bool screensaver_enabled = false;
-  #endif
 #endif
 
 #define DISP_MODE_UNKNOWN   0x00
@@ -178,9 +181,14 @@ uint8_t disp_mode = DISP_MODE_UNKNOWN;
 uint8_t disp_ext_fb = false;
 unsigned char fb[512];
 uint32_t last_disp_update = 0;
-bool display_tx = false;
+uint32_t last_unblank_event = 0;
+uint32_t display_blanking_timeout = DISPLAY_BLANKING_TIMEOUT;
+uint8_t display_unblank_intensity = display_intensity;
+bool display_blanked = false;
+bool display_tx[INTERFACE_COUNT] = {false};
+bool recondition_display = false;
 int disp_update_interval = 1000/disp_target_fps;
-
+int epd_update_interval = 1000/disp_target_fps;
 uint32_t last_page_flip = 0;
 uint32_t last_interface_page_flip = 0;
 int page_interval = 4000;
@@ -238,7 +246,6 @@ void update_area_positions() {
 }
 
 uint8_t display_contrast = 0x00;
-#if DISPLAY == OLED
 #if BOARD_MODEL == BOARD_TBEAM_S_V1
 void set_contrast(Adafruit_SH1106G *display, uint8_t value) {
 }
@@ -267,12 +274,14 @@ for (int i = 0; i < num; i++) {
 }
 level = value;
 }
+#elif BOARD_MODEL == BOARD_OPENCOM_XL || BOARD_MODEL == BOARD_RAK4631 || BOARD_MODEL == BOARD_H_W_PAPER
+  // no backlight on these displays
+  void set_contrast (void* display, uint8_t contrast) {};
 #else
   void set_contrast(Adafruit_SSD1306 *display, uint8_t contrast) {
     display->ssd1306_command(SSD1306_SETCONTRAST);
     display->ssd1306_command(contrast);
   }
-#endif
 #endif
 
 bool display_init() {
@@ -324,33 +333,81 @@ bool display_init() {
       display.init(0, true, 10, false, SPI, SPISettings(4000000, MSBFIRST, SPI_MODE0));
       display.setPartialWindow(0, 0, DISP_W, DISP_H);
 
-      // Because refreshing this display can take some time, sometimes serial
-      // commands will be missed. Therefore, during periods where the device is
-      // waiting for the display to update, it will poll the serial buffer to
-      // check for any commands from the host.
       display.epd2.setBusyCallback(busyCallback);
+      #endif
+    #elif BOARD_MODEL == BOARD_H_W_PAPER
+      pinMode(pin_disp_en, OUTPUT);
+      digitalWrite(pin_disp_en, LOW);
+      display.init(0, true, 10, false, SPI, SPISettings(4000000, MSBFIRST, SPI_MODE0));
+      display.setPartialWindow(0, 0, DISP_W, DISP_H);
+
+      display.epd2.setBusyCallback(busyCallback);
+    #elif BOARD_MODEL == BOARD_HELTEC_T114
+      pinMode(PIN_T114_TFT_EN, OUTPUT);
+      digitalWrite(PIN_T114_TFT_EN, LOW);
+    #elif BOARD_MODEL == BOARD_TECHO
+      display.init(0, true, 10, false, displaySPI, SPISettings(4000000, MSBFIRST, SPI_MODE0));
+      display.setPartialWindow(0, 0, DISP_W, DISP_H);
+      display.epd2.setBusyCallback(busyCallback);
+      #if HAS_BACKLIGHT
+        pinMode(pin_backlight, OUTPUT);
+        analogWrite(pin_backlight, 0);
       #endif
     #elif BOARD_MODEL == BOARD_TBEAM_S_V1
       Wire.begin(SDA_OLED, SCL_OLED);
+    #elif BOARD_MODEL == BOARD_XIAO_S3
+      Wire.begin(SDA_OLED, SCL_OLED);
     #endif
+
+    #if HAS_EEPROM
+      uint8_t display_rotation = EEPROM.read(eeprom_addr(ADDR_CONF_DROT));
+    #elif MCU_VARIANT == MCU_NRF52
+      uint8_t display_rotation = eeprom_read(eeprom_addr(ADDR_CONF_DROT));
+    #endif
+    if (display_rotation < 0 or display_rotation > 3) display_rotation = 0xFF;
 
     #if DISP_CUSTOM_ADDR == true
       #if HAS_EEPROM
-      uint8_t display_address = EEPROM.read(eeprom_addr(ADDR_CONF_DADR));
+        uint8_t display_address = EEPROM.read(eeprom_addr(ADDR_CONF_DADR));
       #elif MCU_VARIANT == MCU_NRF52
-      uint8_t display_address = eeprom_read(eeprom_addr(ADDR_CONF_DADR));
+        uint8_t display_address = eeprom_read(eeprom_addr(ADDR_CONF_DADR));
       #endif
       if (display_address == 0xFF) display_address = DISP_ADDR;
     #else
       uint8_t display_address = DISP_ADDR;
     #endif
 
+    #if HAS_EEPROM
+      if (EEPROM.read(eeprom_addr(ADDR_CONF_BSET)) == CONF_OK_BYTE) {
+        uint8_t db_timeout = EEPROM.read(eeprom_addr(ADDR_CONF_DBLK));
+        if (db_timeout == 0x00) {
+          display_blanking_enabled = false;
+        } else {
+          display_blanking_enabled = true;
+          display_blanking_timeout = db_timeout*1000;
+        }
+      }
+    #elif MCU_VARIANT == MCU_NRF52
+      if (eeprom_read(eeprom_addr(ADDR_CONF_BSET)) == CONF_OK_BYTE) {
+        uint8_t db_timeout = eeprom_read(eeprom_addr(ADDR_CONF_DBLK));
+        if (db_timeout == 0x00) {
+          display_blanking_enabled = false;
+        } else {
+          display_blanking_enabled = true;
+          display_blanking_timeout = db_timeout*1000;
+        }
+      }
+    #endif
+    
     #if DISPLAY == EINK_BW || DISPLAY == EINK_3C
-    // don't check if display is actually connected
     if(false) {
     #elif BOARD_MODEL == BOARD_TDECK
     display.init(240, 320);
     display.setSPISpeed(80e6);
+    #elif BOARD_MODEL == BOARD_HELTEC_T114
+    display.init();
+    // set white as default pixel colour for Heltec T114
+    display.setRGB(COLOR565(0xFF, 0xFF, 0xFF));
     if (false) {
     #elif BOARD_MODEL == BOARD_TBEAM_S_V1
     if (!display.begin(display_address, true)) {
@@ -362,68 +419,96 @@ bool display_init() {
       #if DISPLAY == OLED
         set_contrast(&display, display_contrast);
       #endif
-      #if BOARD_MODEL == BOARD_RNODE_NG_20
+      if (display_rotation != 0xFF) {
+        // hardcode to portrait for now as rotating display doesn't make sense on this platform
         disp_mode = DISP_MODE_PORTRAIT;
-        display.setRotation(3);
-      #elif BOARD_MODEL == BOARD_RNODE_NG_21
-        disp_mode = DISP_MODE_PORTRAIT;
-        display.setRotation(3);
-      #elif BOARD_MODEL == BOARD_LORA32_V1_0
-        disp_mode = DISP_MODE_PORTRAIT;
-        display.setRotation(3);
-      #elif BOARD_MODEL == BOARD_LORA32_V2_0
-        disp_mode = DISP_MODE_PORTRAIT;
-        display.setRotation(3);
-      #elif BOARD_MODEL == BOARD_LORA32_V2_1
-        disp_mode = DISP_MODE_LANDSCAPE;
-        display.setRotation(0);
-      #elif BOARD_MODEL == BOARD_TBEAM
-        disp_mode = DISP_MODE_LANDSCAPE;
-        display.setRotation(0);
-      #elif BOARD_MODEL == BOARD_TBEAM_S_V1
-        disp_mode = DISP_MODE_PORTRAIT;
-        display.setRotation(1);
-      #elif BOARD_MODEL == BOARD_HELTEC32_V2
-        disp_mode = DISP_MODE_PORTRAIT;
-        display.setRotation(1);
-      #elif BOARD_MODEL == BOARD_RAK4631 || BOARD_MODEL == BOARD_OPENCOM_XL
-        #if DISPLAY == OLED
-        #elif DISPLAY == EINK_BW || DISPLAY == EINK_3C
-        disp_mode = DISP_MODE_PORTRAIT;
-        #endif
-      #elif BOARD_MODEL == BOARD_TECHO
-        disp_mode = DISP_MODE_LANDSCAPE;
-        display.setRotation(3);
-      #elif BOARD_MODEL == BOARD_HELTEC32_V3
-        disp_mode = DISP_MODE_PORTRAIT;
-        display.setRotation(1);
-      #elif BOARD_MODEL == BOARD_RAK4631 || BOARD_MODEL == BOARD_OPENCOM_XL
-        disp_mode = DISP_MODE_LANDSCAPE;
-        display.setRotation(0);
-      #elif BOARD_MODEL == BOARD_TDECK
-        disp_mode = DISP_MODE_PORTRAIT;
-        display.setRotation(3);
-      #else
-        disp_mode = DISP_MODE_PORTRAIT;
-        display.setRotation(3);
-      #endif
+        display.setRotation(display_rotation);
+      } else {
+          #if BOARD_MODEL == BOARD_RNODE_NG_20
+            disp_mode = DISP_MODE_PORTRAIT;
+            display.setRotation(3);
+          #elif BOARD_MODEL == BOARD_RNODE_NG_21
+            disp_mode = DISP_MODE_PORTRAIT;
+            display.setRotation(3);
+          #elif BOARD_MODEL == BOARD_LORA32_V1_0
+            disp_mode = DISP_MODE_PORTRAIT;
+            display.setRotation(3);
+          #elif BOARD_MODEL == BOARD_LORA32_V2_0
+            disp_mode = DISP_MODE_PORTRAIT;
+            display.setRotation(3);
+          #elif BOARD_MODEL == BOARD_LORA32_V2_1
+            disp_mode = DISP_MODE_LANDSCAPE;
+            display.setRotation(0);
+          #elif BOARD_MODEL == BOARD_TBEAM
+            disp_mode = DISP_MODE_LANDSCAPE;
+            display.setRotation(0);
+          #elif BOARD_MODEL == BOARD_TBEAM_S_V1
+            disp_mode = DISP_MODE_PORTRAIT;
+            display.setRotation(1);
+          #elif BOARD_MODEL == BOARD_HELTEC32_V2
+            disp_mode = DISP_MODE_PORTRAIT;
+            display.setRotation(1);
+          #elif BOARD_MODEL == BOARD_RAK4631 || BOARD_MODEL == BOARD_OPENCOM_XL
+            #if DISPLAY == OLED
+            #elif DISPLAY == EINK_BW || DISPLAY == EINK_3C
+            disp_mode = DISP_MODE_PORTRAIT;
+            #endif
+          #elif BOARD_MODEL == BOARD_TECHO
+            disp_mode = DISP_MODE_LANDSCAPE;
+            display.setRotation(3);
+          #elif BOARD_MODEL == BOARD_HELTEC32_V3
+            disp_mode = DISP_MODE_PORTRAIT;
+            display.setRotation(1);
+          #elif BOARD_MODEL == BOARD_RAK4631 || BOARD_MODEL == BOARD_OPENCOM_XL
+            disp_mode = DISP_MODE_LANDSCAPE;
+            display.setRotation(0);
+          #elif BOARD_MODEL == BOARD_TDECK
+            disp_mode = DISP_MODE_PORTRAIT;
+            display.setRotation(3);
+          #else
+            disp_mode = DISP_MODE_PORTRAIT;
+            display.setRotation(3);
+          #endif
+      }
 
       update_area_positions();
+      for (int i = 0; i < INTERFACE_COUNT; i++) {
+          for (int j = 0; j < WATERFALL_SIZE; j++) { waterfall[i][j] = 0; }
+      }
 
       last_page_flip = millis();
 
       stat_area.cp437(true);
       disp_area.cp437(true);
-      display.cp437(true);
 
-      #if MCU_VARIANT != MCU_NRF52
+      #if BOARD_MODEL != BOARD_HELTEC_T114
+      display.cp437(true);
+      #endif
+
+      #if HAS_EEPROM
         display_intensity = EEPROM.read(eeprom_addr(ADDR_CONF_DINT));
-      #else
+      #elif MCU_VARIANT == MCU_NRF52
         display_intensity = eeprom_read(eeprom_addr(ADDR_CONF_DINT));
+      #endif
+      display_unblank_intensity = display_intensity;
+
+      #if BOARD_MODEL == BOARD_TECHO
+        #if HAS_BACKLIGHT
+          if (display_intensity == 0) { analogWrite(pin_backlight, 0); }
+          else                        { analogWrite(pin_backlight, display_intensity); }
+        #endif
       #endif
 
       #if BOARD_MODEL == BOARD_TDECK
         display.fillScreen(DISPLAY_BLACK);
+      #endif
+
+      #if BOARD_MODEL == BOARD_HELTEC_T114
+        // Enable backlight led (display is always black without this)
+        fillRect(p_ad_x, p_ad_y, 128, 128, DISPLAY_BLACK);
+        fillRect(p_as_x, p_as_y, 128, 128, DISPLAY_BLACK);
+        pinMode(PIN_T114_TFT_BLGT, OUTPUT);
+        digitalWrite(PIN_T114_TFT_BLGT, LOW);
       #endif
 
       return true;
@@ -691,8 +776,13 @@ void draw_quality_bars(int px, int py) {
     // Serial.printf("Last SNR: %.2f\n, quality: %.2f\n", snr, quality);
 }
 
-#define S_RSSI_MIN -135.0
-#define S_RSSI_MAX -75.0
+#if MODEM == SX1280
+  #define S_RSSI_MIN -105.0
+  #define S_RSSI_MAX -65.0
+#else
+  #define S_RSSI_MIN -135.0
+  #define S_RSSI_MAX -75.0
+#endif
 #define S_RSSI_SPAN (S_RSSI_MAX-S_RSSI_MIN)
 void draw_signal_bars(int px, int py) {
     int rssi_val = last_rssi;
@@ -763,12 +853,12 @@ void draw_waterfall(int px, int py) {
   if (rssi_val < WF_RSSI_MIN) rssi_val = WF_RSSI_MIN;
   if (rssi_val > WF_RSSI_MAX) rssi_val = WF_RSSI_MAX;
   int rssi_normalised = ((rssi_val - WF_RSSI_MIN)*(1.0/WF_RSSI_SPAN))*WF_PIXEL_WIDTH;
-  if (display_tx) {
+  if (display_tx[interface_page]) {
     for (uint8_t i; i < WF_TX_SIZE; i++) {
       waterfall[interface_page][waterfall_head[interface_page]++] = -1;
       if (waterfall_head[interface_page] >= WATERFALL_SIZE) waterfall_head[interface_page] = 0;
     }
-    display_tx = false;
+    display_tx[interface_page] = false;
   } else {
     waterfall[interface_page][waterfall_head[interface_page]++] = rssi_normalised;
     if (waterfall_head[interface_page] >= WATERFALL_SIZE) waterfall_head[interface_page] = 0;
@@ -899,6 +989,9 @@ void update_stat_area() {
   }
 }
 
+extern char bt_devname[11];
+extern char bt_dh[16];
+
 void draw_disp_area() {
   if (!device_init_done || firmware_update_mode) {
     uint8_t p_by = 37;
@@ -1028,6 +1121,14 @@ void draw_disp_area() {
           disp_area.drawBitmap(32+2, 50, bm_hg_high, 5, 9, DISPLAY_BLACK, DISPLAY_WHITE);
         #endif
 
+          disp_area.setTextColor(DISPLAY_BLACK); disp_area.setTextSize(2);
+
+          // TODO, for some reason there is a weird artifact at the top of the screen if this line isn't here. Need to investigate.
+          //disp_area.fillRect(0,0,disp_area.width(),8,DISPLAY_WHITE);
+
+          // display device ID on top bar
+          disp_area.setCursor(3, 8); disp_area.printf("OC-XL %02X%02X", bt_dh[14], bt_dh[15]);
+
       } else {
         if (device_signatures_ok()) {
           #if DISP_H == 122
@@ -1041,6 +1142,11 @@ void draw_disp_area() {
           #else
             disp_area.drawBitmap(0, 0, bm_def, disp_area.width(), 37, DISPLAY_WHITE, DISPLAY_BLACK);
           #endif
+
+            // display device ID beneath header
+            disp_area.setFont(SMALL_FONT); disp_area.setTextWrap(false); disp_area.setCursor(15, 60); disp_area.setTextColor(DISPLAY_WHITE); disp_area.setTextSize(4);
+            disp_area.printf("%02X%02X", bt_dh[14], bt_dh[15]);
+
         }
       }
 
@@ -1187,60 +1293,133 @@ void update_disp_area() {
   }
 }
 
-void do_screensaver(uint32_t current){
+void display_recondition() {
   #if DISPLAY == OLED
-    // Invert display to protect against OLED screen burn in
-    //TODO: Make this a option configurable through rnodeconf
-    //TODO: Implement other ways to do the screensaver, such as scrolling the screen.
-    if (screensaver_enabled) {
-      if (current-last_screensaver >= SCREENSAVER_INTERVAL+SCREENSAVER_TIME) {
-          display.invertDisplay(0);
-          last_screensaver = current;
-          screensaver_enabled = false;
-      }
+    for (uint8_t iy = 0; iy < disp_area.height(); iy++) {
+      unsigned char rand_seg [] = {random(0xFF),random(0xFF),random(0xFF),random(0xFF),random(0xFF),random(0xFF),random(0xFF),random(0xFF)};
+      stat_area.drawBitmap(0, iy, rand_seg, 64, 1, DISPLAY_WHITE, DISPLAY_BLACK);
+      disp_area.drawBitmap(0, iy, rand_seg, 64, 1, DISPLAY_WHITE, DISPLAY_BLACK);
     }
-    else if (current-last_screensaver >= SCREENSAVER_INTERVAL) {
-      display.invertDisplay(1);
-      screensaver_enabled = true;
+
+    display.drawBitmap(p_ad_x, p_ad_y, disp_area.getBuffer(), disp_area.width(), disp_area.height(), DISPLAY_WHITE, DISPLAY_BLACK);
+    if (disp_mode == DISP_MODE_PORTRAIT) {
+      display.drawBitmap(p_as_x, p_as_y, stat_area.getBuffer(), stat_area.width(), stat_area.height(), DISPLAY_WHITE, DISPLAY_BLACK);
+    } else if (disp_mode == DISP_MODE_LANDSCAPE) {
+      display.drawBitmap(p_as_x, p_as_y, stat_area.getBuffer(), stat_area.width(), stat_area.height(), DISPLAY_WHITE, DISPLAY_BLACK);
     }
   #endif
 }
 
+bool epd_blanked = false;
+#if DISPLAY == EINK_3C || DISPLAY == EINK_BW
+  void epd_blank(bool full_update = true) {
+    display.setFullWindow();
+    display.fillScreen(DISPLAY_WHITE);
+    display.display(full_update);
+  }
+
+  void epd_black(bool full_update = true) {
+    display.setFullWindow();
+    display.fillScreen(DISPLAY_BLACK);
+    display.display(full_update);
+  }
+#endif
+
 void update_display(bool blank = false) {
-  #if DISPLAY == OLED
-    if (display_contrast != display_intensity) {
-      display_contrast = display_intensity;
-      set_contrast(&display, display_contrast);
+  display_updating = true;
+  if (blank == true) {
+    last_disp_update = millis()-disp_update_interval-1;
+  } else {
+    if (display_blanking_enabled && millis()-last_unblank_event >= display_blanking_timeout) {
+      blank = true;
+      display_blanked = true;
+      if (display_intensity != 0) {
+        display_unblank_intensity = display_intensity;
+      }
+      display_intensity = 0;
+    } else {
+      display_blanked = false;
+      if (display_unblank_intensity != 0x00) {
+        display_intensity = display_unblank_intensity;
+        display_unblank_intensity = 0x00;
+      }
     }
-    display.clearDisplay();
-  #endif
+  }
+
   if (blank) {
-    display.display();    
+    if (millis()-last_disp_update >= disp_update_interval) {
+      if (display_contrast != display_intensity) {
+        display_contrast = display_intensity;
+        set_contrast(&display, display_contrast);
+      }
+
+      #if DISPLAY == EINK_3C || DISPLAY == EINK_BW
+        if (!epd_blanked) {
+          epd_blank();
+          epd_blanked = true;
+        }
+      #endif
+
+      #if BOARD_MODEL == BOARD_HELTEC_T114
+        display.clear();
+        display.display();
+      #elif BOARD_MODEL != BOARD_TDECK && DISPLAY != EINK_3C && DISPLAY != EINK_BW
+        display.clearDisplay();
+        display.display();
+      #else
+        // TODO: Clear screen
+      #endif
+
+      last_disp_update = millis();
+    }
+
   } else {
     if (millis()-last_disp_update >= disp_update_interval) {
       uint32_t current = millis();
-      do_screensaver(current);
-      #if DISPLAY == EINK_BW || DISPLAY == EINK_3C
-      display.setFullWindow();
-      display.fillScreen(DISPLAY_WHITE);
-      #endif
-      update_stat_area();
-      update_disp_area();
-      #if DISPLAY == OLED
-      display.display();
-      #else
-      if (current-last_epd_refresh >= REFRESH_PERIOD) {
-        // Perform a full refresh after the correct time has elapsed
-        display.display(false);
-        last_epd_refresh = current;
-      } else {
-        // Only perform a partial refresh
-        display.display(true);
+      if (display_contrast != display_intensity) {
+        display_contrast = display_intensity;
+        set_contrast(&display, display_contrast);
       }
+
+      #if BOARD_MODEL == BOARD_HELTEC_T114
+        display.clear();
+      #elif BOARD_MODEL != BOARD_TDECK && DISPLAY != EINK_3C && DISPLAY != EINK_BW
+        display.clearDisplay();
       #endif
-      last_disp_update = current;
+
+      if (recondition_display) {
+        disp_target_fps = 30;
+        disp_update_interval = 1000/disp_target_fps;
+        display_recondition();
+      } else {
+        #if DISPLAY == EINK_BW || DISPLAY == EINK_3C
+          display.setFullWindow();
+          display.fillScreen(DISPLAY_WHITE);
+        #endif
+
+        update_stat_area();
+        update_disp_area();
+      }
+      
+      #if DISPLAY == EINK_BW || DISPLAY == EINK_3C
+        if (current-last_epd_refresh >= epd_update_interval) {
+          if (current-last_epd_full_refresh >= REFRESH_PERIOD) { display.display(false); last_epd_full_refresh = millis(); }
+          else { display.display(true); }
+          last_epd_refresh = millis();
+          epd_blanked = false;
+        }
+      #elif BOARD_MODEL != BOARD_TDECK
+        display.display();
+      #endif
+
+      last_disp_update = millis();
     }
   }
+  display_updating = false;
+}
+
+void display_unblank() {
+  last_unblank_event = millis();
 }
 
 void ext_fb_enable() {

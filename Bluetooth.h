@@ -29,12 +29,11 @@
 #elif MCU_VARIANT == MCU_NRF52
   #include <bluefruit.h>
   #include <math.h>
-  #define BLE_MTU 512+3
-  BLEUart SerialBT(BLE_MTU);
+  #define BLE_RX_BUF 6144
+  BLEUart SerialBT(BLE_RX_BUF);
   BLEDis  bledis;
   BLEBas  blebas;
   bool SerialBT_init = false;
-  extern void led_indicate_info(int);
 #endif
 
 #define BT_PAIRING_TIMEOUT 35000
@@ -47,6 +46,8 @@ uint8_t dev_bt_mac[BT_DEV_ADDR_LEN];
 char bt_da[BT_DEV_ADDR_LEN];
 char bt_dh[BT_DEV_HASH_LEN];
 char bt_devname[11];
+
+extern void led_indicate_info(int);
 
 #if MCU_VARIANT == MCU_ESP32
   #if HAS_BLUETOOTH == true
@@ -62,7 +63,7 @@ char bt_devname[11];
     }
 
     void bt_stop() {
-      //display_unblank();
+      display_unblank();
       if (bt_state != BT_STATE_OFF) {
         SerialBT.end();
         bt_allow_pairing = false;
@@ -71,7 +72,7 @@ char bt_devname[11];
     }
 
     void bt_start() {
-      //display_unblank();
+      display_unblank();
       if (bt_state == BT_STATE_OFF) {
         SerialBT.begin(bt_devname);
         bt_state = BT_STATE_ON;
@@ -79,7 +80,7 @@ char bt_devname[11];
     }
 
     void bt_enable_pairing() {
-      //display_unblank();
+      display_unblank();
       if (bt_state == BT_STATE_OFF) bt_start();
       bt_allow_pairing = true;
       bt_pairing_started = millis();
@@ -87,14 +88,14 @@ char bt_devname[11];
     }
 
     void bt_disable_pairing() {
-      //display_unblank();
+      display_unblank();
       bt_allow_pairing = false;
       bt_ssp_pin = 0;
       bt_state = BT_STATE_ON;
     }
 
     void bt_pairing_complete(boolean success) {
-      //display_unblank();
+      display_unblank();
       if (success) {
         bt_disable_pairing();
       } else {
@@ -103,7 +104,7 @@ char bt_devname[11];
     }
 
     void bt_connection_callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) {
-      //display_unblank();
+      display_unblank();
       if(event == ESP_SPP_SRV_OPEN_EVT) {
         bt_state = BT_STATE_CONNECTED;
         cable_state = CABLE_STATE_DISCONNECTED;
@@ -166,31 +167,42 @@ char bt_devname[11];
     }
 
   #elif HAS_BLE == true
+    bool bt_setup_hw(); void bt_security_setup();
     BLESecurity *ble_security = new BLESecurity();
     bool ble_authenticated = false;
     uint32_t pairing_pin = 0;
 
     void bt_flush() { if (bt_state == BT_STATE_CONNECTED) { SerialBT.flush(); } }
 
-    void bt_disable_pairing() {
-      //display_unblank();
-      bt_allow_pairing = false;
-      bt_ssp_pin = 0;
-      bt_state = BT_STATE_ON;
+    void bt_start() {
+      // Serial.println("BT start");
+      display_unblank();
+      if (bt_state == BT_STATE_OFF) {
+        bt_state = BT_STATE_ON;
+        SerialBT.begin(bt_devname);
+        SerialBT.setTimeout(10);
+      }
     }
 
-    void bt_passkey_notify_callback(uint32_t passkey) {
-      // Serial.printf("Got passkey notification: %d\n", passkey);
-      bt_ssp_pin = passkey;
-      bt_state = BT_STATE_PAIRING;
-      bt_allow_pairing = true;
-      bt_pairing_started = millis();
-      kiss_indicate_btpin();
+    void bt_stop() {
+      // Serial.println("BT stop");
+      display_unblank();
+      if (bt_state != BT_STATE_OFF) {
+        bt_allow_pairing = false;
+        bt_state = BT_STATE_OFF;
+        SerialBT.end();
+      }
     }
 
-    bool bt_confirm_pin_callback(uint32_t pin) {
-      // Serial.printf("Confirm PIN callback: %d\n", pin);
-      return true;
+    bool bt_init() {
+      // Serial.println("BT init");
+      bt_state = BT_STATE_OFF;
+      if (bt_setup_hw()) {
+        if (bt_enabled && !console_active) bt_start();
+        return true;
+      } else {
+        return false;
+      }
     }
 
     void bt_debond_all() {
@@ -200,6 +212,44 @@ char bt_devname[11];
       esp_ble_get_bond_device_list(&dev_num, dev_list);
       for (int i = 0; i < dev_num; i++) { esp_ble_remove_bond_device(dev_list[i].bd_addr); }
       free(dev_list);
+    }
+
+    void bt_enable_pairing() {
+      // Serial.println("BT enable pairing");
+      display_unblank();
+      if (bt_state == BT_STATE_OFF) bt_start();
+
+      bt_security_setup();
+
+      bt_allow_pairing = true;
+      bt_pairing_started = millis();
+      bt_state = BT_STATE_PAIRING;
+      bt_ssp_pin = pairing_pin;
+    }
+
+    void bt_disable_pairing() {
+      // Serial.println("BT disable pairing");
+      display_unblank();
+      bt_allow_pairing = false;
+      bt_ssp_pin = 0;
+      bt_state = BT_STATE_ON;
+    }
+
+    void bt_passkey_notify_callback(uint32_t passkey) {
+      // Serial.printf("Got passkey notification: %d\n", passkey);
+      if (bt_allow_pairing) {
+        bt_ssp_pin = passkey;
+        bt_pairing_started = millis();
+        kiss_indicate_btpin();
+      } else {
+        // Serial.println("Pairing not allowed, re-init");
+        SerialBT.disconnect();
+      }
+    }
+
+    bool bt_confirm_pin_callback(uint32_t pin) {
+      // Serial.printf("Confirm PIN callback: %d\n", pin);
+      return true;
     }
 
     void bt_update_passkey() {
@@ -218,31 +268,6 @@ char bt_devname[11];
       return ble_authenticated;
     }
 
-    void bt_security_setup() {
-      uint32_t passkey = bt_passkey_callback();
-
-      // Serial.printf("Executing BT security setup, passkey is %d\n", passkey);
-
-      uint8_t key_size = 16;
-      uint8_t init_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
-      uint8_t rsp_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
-
-      esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_MITM_BOND;
-      uint8_t auth_option = ESP_BLE_ONLY_ACCEPT_SPECIFIED_AUTH_ENABLE;
-      uint8_t oob_support = ESP_BLE_OOB_DISABLE;
-
-      esp_ble_io_cap_t iocap = ESP_IO_CAP_OUT;
-
-      esp_ble_gap_set_security_param(ESP_BLE_SM_SET_STATIC_PASSKEY, &passkey, sizeof(uint32_t));
-      esp_ble_gap_set_security_param(ESP_BLE_SM_AUTHEN_REQ_MODE, &auth_req, sizeof(uint8_t));
-      esp_ble_gap_set_security_param(ESP_BLE_SM_IOCAP_MODE, &iocap, sizeof(uint8_t));
-      esp_ble_gap_set_security_param(ESP_BLE_SM_MAX_KEY_SIZE, &key_size, sizeof(uint8_t));
-      esp_ble_gap_set_security_param(ESP_BLE_SM_ONLY_ACCEPT_SPECIFIED_SEC_AUTH, &auth_option, sizeof(uint8_t));
-      esp_ble_gap_set_security_param(ESP_BLE_SM_OOB_SUPPORT, &oob_support, sizeof(uint8_t));
-      esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
-      esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
-    }
-
     bool bt_security_request_callback() {
       if (bt_allow_pairing) {
           // Serial.println("Accepting security request");
@@ -257,11 +282,15 @@ char bt_devname[11];
       if (auth_result.success == true) {
         // Serial.println("Authentication success");
         ble_authenticated = true;
-        bt_state = BT_STATE_CONNECTED;
+        if (bt_state == BT_STATE_PAIRING) {
+          // Serial.println("Pairing complete, disconnecting");
+          delay(2000); SerialBT.disconnect();
+        } else { bt_state = BT_STATE_CONNECTED; }
       } else {
         // Serial.println("Authentication fail");
         ble_authenticated = false;
         bt_state = BT_STATE_ON;
+        bt_update_passkey();
         bt_security_setup();
       }
       bt_allow_pairing = false;
@@ -269,23 +298,24 @@ char bt_devname[11];
     }
 
     void bt_connect_callback(BLEServer *server) {
-      // uint16_t conn_id = server->getConnId();
+      uint16_t conn_id = server->getConnId();
       // Serial.printf("Connected: %d\n", conn_id);
-      //display_unblank();
+      display_unblank();
       ble_authenticated = false;
-      bt_state = BT_STATE_CONNECTED;
+      if (bt_state != BT_STATE_PAIRING) { bt_state = BT_STATE_CONNECTED; }
       cable_state = CABLE_STATE_DISCONNECTED;
     }
 
     void bt_disconnect_callback(BLEServer *server) {
-      // uint16_t conn_id = server->getConnId();
+      uint16_t conn_id = server->getConnId();
       // Serial.printf("Disconnected: %d\n", conn_id);
-      //display_unblank();
+      display_unblank();
       ble_authenticated = false;
       bt_state = BT_STATE_ON;
     }
 
     bool bt_setup_hw() {
+      // Serial.println("BT setup hw");
       if (!bt_ready) {
         if (EEPROM.read(eeprom_addr(ADDR_CONF_BT)) == BT_ENABLE_BYTE) {
           bt_enabled = true;
@@ -317,45 +347,30 @@ char bt_devname[11];
       } else { return false; }
     }
 
-    void bt_start() {
-      //display_unblank();
-      if (bt_state == BT_STATE_OFF) {
-        bt_state = BT_STATE_ON;
-        SerialBT.begin(bt_devname);
-        SerialBT.setTimeout(10);
-      }
-    }
+    void bt_security_setup() {
+      // Serial.println("Executing BT security setup");
+      if (pairing_pin == 0) { bt_update_passkey(); }
+      uint32_t passkey = pairing_pin;
+      // Serial.printf("Passkey is %d\n", passkey);
 
-    void bt_stop() {
-      //display_unblank();
-      if (bt_state != BT_STATE_OFF) {
-        bt_allow_pairing = false;
-        bt_state = BT_STATE_OFF;
-        SerialBT.end();
-      }
-    }
+      uint8_t key_size = 16;
+      uint8_t init_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
+      uint8_t rsp_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
 
-    bool bt_init() {
-        bt_state = BT_STATE_OFF;
-        if (bt_setup_hw()) {
-          if (bt_enabled && !console_active) bt_start();
-          return true;
-        } else {
-          return false;
-        }
-    }
+      esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_MITM_BOND;
+      uint8_t auth_option = ESP_BLE_ONLY_ACCEPT_SPECIFIED_AUTH_ENABLE;
+      uint8_t oob_support = ESP_BLE_OOB_DISABLE;
 
-    void bt_enable_pairing() {
-      //display_unblank();
-      if (bt_state == BT_STATE_OFF) bt_start();
+      esp_ble_io_cap_t iocap = ESP_IO_CAP_OUT;
 
-      bt_security_setup();
-      //bt_debond_all();
-      //bt_update_passkey();
-
-      bt_allow_pairing = true;
-      bt_pairing_started = millis();
-      bt_state = BT_STATE_PAIRING;
+      esp_ble_gap_set_security_param(ESP_BLE_SM_SET_STATIC_PASSKEY, &passkey, sizeof(uint32_t));
+      esp_ble_gap_set_security_param(ESP_BLE_SM_AUTHEN_REQ_MODE, &auth_req, sizeof(uint8_t));
+      esp_ble_gap_set_security_param(ESP_BLE_SM_IOCAP_MODE, &iocap, sizeof(uint8_t));
+      esp_ble_gap_set_security_param(ESP_BLE_SM_MAX_KEY_SIZE, &key_size, sizeof(uint8_t));
+      esp_ble_gap_set_security_param(ESP_BLE_SM_ONLY_ACCEPT_SPECIFIED_SEC_AUTH, &auth_option, sizeof(uint8_t));
+      esp_ble_gap_set_security_param(ESP_BLE_SM_OOB_SUPPORT, &oob_support, sizeof(uint8_t));
+      esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
+      esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
     }
 
     void update_bt() {
@@ -371,15 +386,12 @@ char bt_devname[11];
   #endif
 
 #elif MCU_VARIANT == MCU_NRF52
+    uint32_t pairing_pin = 0;
+
   uint8_t eeprom_read(uint32_t mapped_addr);
 
-  void bt_bond_wipe() {
-      // Delete all bonding data
-      Bluefruit.Periph.clearBonds();
-      led_indicate_info(2);
-  }
-
   void bt_stop() {
+    // Serial.println("BT Stop");
     if (bt_state != BT_STATE_OFF) {
       bt_allow_pairing = false;
       bt_state = BT_STATE_OFF;
@@ -387,16 +399,21 @@ char bt_devname[11];
   }
 
   void bt_disable_pairing() {
+    // Serial.println("BT Disable pairing");
     bt_allow_pairing = false;
+    pairing_pin = 0;
     bt_ssp_pin = 0;
     bt_state = BT_STATE_ON;
   }
 
-  void bt_pairing_complete(uint16_t conn_handle, uint8_t auth_status) {
-    if (auth_status == BLE_GAP_SEC_STATUS_SUCCESS) {
-      BLEConnection* connection = Bluefruit.Connection(conn_handle);
+  void bt_flush() { if (bt_state == BT_STATE_CONNECTED) { SerialBT.flushTXD(); } }
 
+  void bt_pairing_complete(uint16_t conn_handle, uint8_t auth_status) {
+    // Serial.println("BT pairing complete");
+    BLEConnection* connection = Bluefruit.Connection(conn_handle);
+    if (auth_status == BLE_GAP_SEC_STATUS_SUCCESS) {
       ble_gap_conn_sec_mode_t security = connection->getSecureMode();
+      // Serial.println("Bonding success");
 
       // On the NRF52 it is not possible with the Arduino library to reject
       // requests from devices with no IO capabilities, which would allow
@@ -413,26 +430,26 @@ char bt_devname[11];
       // Requires investigation.
 
       if (security.sm == 1 && security.lv >= 3) {
+          // Serial.println("Auth level success");
           bt_state = BT_STATE_CONNECTED;
           cable_state = CABLE_STATE_DISCONNECTED;
+          connection->disconnect();
           bt_disable_pairing();
       } else {
-          if (connection->bonded()) {
-              connection->removeBondKey();
-          }
+          // Serial.println("Auth level failure, debonding");
+          if (connection->bonded()) { connection->removeBondKey(); }
           connection->disconnect();
+          bt_disable_pairing();
       }
     } else {
-      bt_ssp_pin = 0;
+      // Serial.println("Bonding failure");
+      connection->disconnect();
+      bt_disable_pairing();
     }
   }
 
   bool bt_passkey_callback(uint16_t conn_handle, uint8_t const passkey[6], bool match_request) {
-    for (int i = 0; i < 6; i++) {
-      // multiply by tens however many times needed to make numbers appear in order
-      bt_ssp_pin += ((int)passkey[i] - 48) * pow(10, 5-i);
-    }
-    kiss_indicate_btpin();
+    // Serial.println("Passkey callback");
     if (bt_allow_pairing) {
       return true;
     }
@@ -440,21 +457,37 @@ char bt_devname[11];
   }
 
   void bt_connect_callback(uint16_t conn_handle) {
+    // Serial.println("Connect callback");
     bt_state = BT_STATE_CONNECTED;
     cable_state = CABLE_STATE_DISCONNECTED;
+
     BLEConnection* conn = Bluefruit.Connection(conn_handle);
     conn->requestPHY(BLE_GAP_PHY_2MBPS);
-    conn->requestMtuExchange(BLE_MTU);
+    conn->requestMtuExchange(512+3);
     conn->requestDataLengthUpdate();
-}
+  }
 
-void bt_disconnect_callback(uint16_t conn_handle, uint8_t reason) {
+  void bt_disconnect_callback(uint16_t conn_handle, uint8_t reason) {
+    // Serial.println("Disconnect callback");
     if (reason != BLE_GAP_SEC_STATUS_SUCCESS) {
         bt_state = BT_STATE_ON;
     }
-}
+  }
+
+  void bt_update_passkey() {
+    // Serial.println("Update passkey");
+    pairing_pin = random(899999)+100000;
+    bt_ssp_pin = pairing_pin;
+  }
+
+  uint32_t bt_get_passkey() {
+    // Serial.println("API passkey request");
+    if (pairing_pin == 0) { bt_update_passkey(); }
+    return pairing_pin;
+  }
 
   bool bt_setup_hw() {
+    // Serial.println("Setup HW");
     if (!bt_ready) {
       #if HAS_EEPROM 
           if (EEPROM.read(eeprom_addr(ADDR_CONF_BT)) == BT_ENABLE_BYTE) {
@@ -468,6 +501,10 @@ void bt_disconnect_callback(uint16_t conn_handle, uint8_t reason) {
       Bluefruit.configPrphBandwidth(BANDWIDTH_MAX);
       Bluefruit.autoConnLed(false);
       if (Bluefruit.begin()) {
+        uint32_t pin = bt_get_passkey();
+        char pin_char[6];
+        sprintf(pin_char,"%lu", pin);
+
         Bluefruit.setTxPower(8);    // Check bluefruit.h for supported values
         Bluefruit.Security.setIOCaps(true, false, false); // display, yes; yes / no, no; keyboard, no
         // This device is indeed capable of yes / no through the pairing mode
@@ -477,6 +514,7 @@ void bt_disconnect_callback(uint16_t conn_handle, uint8_t reason) {
         Bluefruit.Security.setMITM(true);
         Bluefruit.Security.setPairPasskeyCallback(bt_passkey_callback);
         Bluefruit.Security.setSecuredCallback(bt_connect_callback);
+        Bluefruit.Security.setPIN(pin_char);
         Bluefruit.Periph.setDisconnectCallback(bt_disconnect_callback);
         Bluefruit.Security.setPairCompleteCallback(bt_pairing_complete);
         Bluefruit.Periph.setConnInterval(6, 12); // 7.5 - 15 ms
@@ -504,22 +542,23 @@ void bt_disconnect_callback(uint16_t conn_handle, uint8_t reason) {
   }
 
   void bt_start() {
+    // Serial.println("BT Start");
     if (bt_state == BT_STATE_OFF) {
       Bluefruit.setName(bt_devname);
       bledis.setManufacturer(BLE_MANUFACTURER);
       bledis.setModel(BLE_MODEL);
       // start device information service
       bledis.begin();
+      blebas.begin();
 
       // Guard to ensure SerialBT service is not duplicated through BT being power cycled
       if (!SerialBT_init) {
           SerialBT.bufferTXD(true); // enable buffering
+
           SerialBT.setPermission(SECMODE_ENC_WITH_MITM, SECMODE_ENC_WITH_MITM); // enable encryption for BLE serial
           SerialBT.begin();
           SerialBT_init = true;
       }
-
-      blebas.begin();
 
       Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
       Bluefruit.Advertising.addTxPower();
@@ -538,6 +577,7 @@ void bt_disconnect_callback(uint16_t conn_handle, uint8_t reason) {
   }
 
   bool bt_init() {
+    // Serial.println("BT init");
     bt_state = BT_STATE_OFF;
     if (bt_setup_hw()) {
       if (bt_enabled && !console_active) bt_start();
@@ -548,10 +588,24 @@ void bt_disconnect_callback(uint16_t conn_handle, uint8_t reason) {
   }
 
   void bt_enable_pairing() {
+    // Serial.println("BT enable pairing");
     if (bt_state == BT_STATE_OFF) bt_start();
+
+    uint32_t pin = bt_get_passkey();
+    char pin_char[6];
+    sprintf(pin_char,"%lu", pin);
+    Bluefruit.Security.setPIN(pin_char);
+
     bt_allow_pairing = true;
     bt_pairing_started = millis();
     bt_state = BT_STATE_PAIRING;
+    kiss_indicate_btpin();
+  }
+
+  void bt_debond_all() {
+      // Delete all bonding data
+      Bluefruit.Periph.clearBonds();
+      led_indicate_info(2);
   }
 
   void update_bt() {

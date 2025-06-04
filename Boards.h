@@ -73,46 +73,49 @@
   #define MODEL_B3            0xB3 // LilyGO T3 v2.0, 433 MHz
   #define MODEL_B8            0xB8 // LilyGO T3 v2.0, 868 MHz
 
-  #define PRODUCT_T32_21      0xB1 // T3 v2.1 - sold by LilyGO
+  #define PRODUCT_T32_21      0xB1
   #define BOARD_LORA32_V2_1   0x37
-  #define MODEL_B4            0xB4 // LilyGO T3 v2.1, 433 MHz
-  #define MODEL_B9            0xB9 // LilyGO T3 v2.1, 868 MHz
+  #define MODEL_B4            0xB4  // LilyGO T3 v2.1, 433 MHz
+  #define MODEL_B9            0xB9  // LilyGO T3 v2.1, 868 MHz
 
-  #define BOARD_T3S3          0x42 // T3S3 - sold by LilyGO
-  #define MODEL_A1 0xA1            // T3S3 SX1262 868/915 MHz
-  #define MODEL_AB 0xAB            // T3S3 SX1276 868/915 MHz
-  #define MODEL_A5 0xA5            // T3S3 SX1278 433 MHz
-  #define MODEL_AC 0xAC            // T3S3 SX1280 2.4 GHz w/ PA
-
-  #define PRODUCT_TECHO 0x15       // LilyGO T-Echo devices
-  #define BOARD_TECHO         0x43
-  #define MODEL_16 0x16            // T-Echo 433 MHz
-  #define MODEL_17 0x17            // T-Echo 868/915 MHz
-
-
-  #define PRODUCT_H32_V2      0xC0 // LoRa32 v2 - sold by Heltec
+  #define PRODUCT_H32_V2      0xC0  // Board code 0x38
   #define BOARD_HELTEC32_V2   0x38
-  #define MODEL_C4            0xC4 // Heltec Lora32 v2, 433 MHz
-  #define MODEL_C9            0xC9 // Heltec Lora32 v2, 868 MHz
+  #define MODEL_C4            0xC4  // Heltec Lora32 v2, 433 MHz
+  #define MODEL_C9            0xC9  // Heltec Lora32 v2, 868 MHz
 
-  #define PRODUCT_H32_V3      0xC1 // LoRa32 v3 - sold by Heltec
+  #define PRODUCT_H32_V3      0xC1
   #define BOARD_HELTEC32_V3   0x3A
   #define MODEL_C5            0xC5 // Heltec Lora32 v3, 433 MHz
   #define MODEL_CA            0xCA // Heltec Lora32 v3, 868 MHz
+  
+  #define PRODUCT_H_W_PAPER   0xC3
+  #define BOARD_H_W_PAPER     0x3F
+  #define MODEL_C8            0xC8
 
   #define PRODUCT_RAK4631     0x10 // RAK4631 - sold by RAKWireless
   #define BOARD_RAK4631       0x51
   #define MODEL_11            0x11 // RAK4631, 433 MHz
   #define MODEL_12            0x12 // RAK4631, 868 MHz
-  #define MODEL_13            0x13 // RAK4631, 433MHz with WisBlock SX1280 module (LIBSYS002)
-  #define MODEL_14            0x14 // RAK4631, 868/915 MHz with WisBlock SX1280 module (LIBSYS002)
+  #define MODEL_13            0x13 // RAK4631, 433MHz with WisBlock SX1280 module (LIBSYS002 rev 1.3)
+  #define MODEL_14            0x14 // RAK4631, 868/915 MHz with WisBlock SX1280 module (LIBSYS002 rev 1.3)
 
   #define PRODUCT_OPENCOM_XL  0x20 // openCom XL - sold by Liberated Embedded Systems
   #define BOARD_OPENCOM_XL    0x52
-  #define MODEL_21            0x21 // openCom XL, 868/915 MHz
+  #define MODEL_21            0x21 // openCom XL v1, 868/915 MHz
 
-  #define BOARD_E22_ESP32     0x44 // Custom Ebyte E22 board design for meshtastic, source:
+  #define BOARD_E22_ESP32     0x45 // Custom Ebyte E22 board design for meshtastic, source:
                                    // https://github.com/NanoVHF/Meshtastic-DIY/blob/main/Schematics/E-Byte_E22/Mesh_Ebyte_E22-XXXM30S.pdf
+
+  #define PRODUCT_HELTEC_T114 0xC2 // Heltec Mesh Node T114
+  #define BOARD_HELTEC_T114   0x3C
+  #define MODEL_C6            0xC6 // Heltec Mesh Node T114, 470-510 MHz
+  #define MODEL_C7            0xC7 // Heltec Mesh Node T114, 863-928 MHz
+  #define MODEL_CB            0xCB // Heltec Mesh Node T114, 863-928 MHz + GPS
+
+  #define PRODUCT_TECHO       0x15 // LilyGO T-Echo devices
+  #define BOARD_TECHO         0x44
+  #define MODEL_16            0x16 // T-Echo 433 MHz
+  #define MODEL_17            0x17 // T-Echo 868/915 MHz
 
   #define PRODUCT_HMBRW       0xF0
   #define BOARD_HMBRW         0x32
@@ -155,11 +158,9 @@
   #endif
 
   #if MCU_VARIANT == MCU_ESP32
-
-    // Board models for ESP32 based builds are
-    // defined by the build target in the makefile.
-    // If you are not using make to compile this
-    // firmware, you can manually define model here.
+    // Board models for ESP32 based builds are defined by the build target in
+    // the makefile. If you are not using make to compile this firmware, you
+    // can manually define the model here.
     //
     // #define BOARD_MODEL BOARD_GENERIC_ESP32
     #define CONFIG_UART_BUFFER_SIZE 6144
@@ -180,7 +181,7 @@
       #define INTERFACE_COUNT 1
       const int pin_led_rx = 14;
       const int pin_led_tx = 32;
-      const uint8_t interfaces[INTERFACE_COUNT] = {SX127X};
+      const uint8_t interfaces[INTERFACE_COUNT] = {SX1276};
       const bool interface_cfg[INTERFACE_COUNT][3] = { 
                     // SX127X
           {
@@ -223,7 +224,7 @@
       const int pin_led_tx = 4;
 
       #if BOARD_VARIANT == MODEL_E4 || BOARD_VARIANT == MODEL_E9
-      const uint8_t interfaces[INTERFACE_COUNT] = {SX127X};
+      const uint8_t interfaces[INTERFACE_COUNT] = {SX1276};
       const bool interface_cfg[INTERFACE_COUNT][3] = { 
                     // SX127X
           {
@@ -249,7 +250,8 @@
       };
 
       #elif BOARD_VARIANT == MODEL_E3 || BOARD_VARIANT == MODEL_E8
-      const uint8_t interfaces[INTERFACE_COUNT] = {SX126X};
+      #define OCP_TUNED 0x38
+      const uint8_t interfaces[INTERFACE_COUNT] = {SX1262};
       const bool interface_cfg[INTERFACE_COUNT][3] = { 
                     // SX1262
           {
@@ -283,7 +285,7 @@
       const int pin_led_rx = 14;
       const int pin_led_tx = 32;
 
-      const uint8_t interfaces[INTERFACE_COUNT] = {SX127X};
+      const uint8_t interfaces[INTERFACE_COUNT] = {SX1276};
       const bool interface_cfg[INTERFACE_COUNT][3] = { 
                     // SX127X
           {
@@ -293,7 +295,7 @@
           }, 
       };
       const int8_t interface_pins[INTERFACE_COUNT][10] = { 
-                  // SX1262
+                  // SX127X
           {
                4, // pin_ss
               -1, // pin_sclk
@@ -370,7 +372,7 @@
       #endif
 
 
-      const uint8_t interfaces[INTERFACE_COUNT] = {SX127X};
+      const uint8_t interfaces[INTERFACE_COUNT] = {SX1276};
       const bool interface_cfg[INTERFACE_COUNT][3] = { 
                     // SX127X
           {
@@ -400,11 +402,14 @@
       #define DISPLAY OLED
       #define HAS_BLUETOOTH true
       #define HAS_PMU true
+      #define HAS_NP true
       #define HAS_CONSOLE true
       #define HAS_EEPROM true
       #define INTERFACE_COUNT 1
+      
+      const int pin_np = 12;
 
-      const uint8_t interfaces[INTERFACE_COUNT] = {SX127X};
+      const uint8_t interfaces[INTERFACE_COUNT] = {SX1276};
       #if HAS_TCXO == true
         const bool interface_cfg[INTERFACE_COUNT][3] = { 
                         // SX127X
@@ -487,7 +492,7 @@
         const int pin_led_tx = 25;
       #endif
 
-      const uint8_t interfaces[INTERFACE_COUNT] = {SX127X};
+      const uint8_t interfaces[INTERFACE_COUNT] = {SX1276};
       const bool interface_cfg[INTERFACE_COUNT][3] = { 
                     // SX127X
           {
@@ -515,6 +520,7 @@
     #elif BOARD_MODEL == BOARD_HELTEC32_V3
       #define IS_ESP32S3 true
       #define HAS_DISPLAY true
+      #define DISPLAY OLED
       #define HAS_BLUETOOTH false
       #define HAS_BLE true
       #define HAS_PMU true
@@ -525,6 +531,7 @@
       #define PIN_WAKEUP GPIO_NUM_0
       #define WAKEUP_LEVEL 0
       #define INTERFACE_COUNT 1
+      #define OCP_TUNED 0x38
 
       const int pin_btn_usr1 = 0;
 
@@ -636,8 +643,7 @@
         #endif
       #endif
 
-
-      const uint8_t interfaces[INTERFACE_COUNT] = {SX127X};
+      const uint8_t interfaces[INTERFACE_COUNT] = {SX1276};
       const bool interface_cfg[INTERFACE_COUNT][3] = { 
                     // SX127X
           {
@@ -661,12 +667,12 @@
               -1  // pin_tcxo_enable
           }
       };
-
+   
     #elif BOARD_MODEL == BOARD_T3S3
       #define IS_ESP32S3 true
       #define HAS_DISPLAY true
       #define DISPLAY OLED
-      #define HAS_CONSOLE false
+      #define HAS_CONSOLE true
       #define HAS_BLUETOOTH false
       #define HAS_BLE true
       #define HAS_PMU true
@@ -753,12 +759,169 @@
           }
       };
       #endif
+      
+      const int pin_np = 38;
+      const int pin_dac = 25;
+      const int pin_adc = 1;
+
+      const int SD_MISO = 2;
+      const int SD_MOSI = 11;
+      const int SD_CLK = 14;
+      const int SD_CS = 13;
+
+      #if HAS_NP == false
+        #if defined(EXTERNAL_LEDS)
+          const int pin_led_rx = 37;
+          const int pin_led_tx = 37;
+        #else
+          const int pin_led_rx = 37;
+          const int pin_led_tx = 37;
+        #endif
+      #endif
+
+    #elif BOARD_MODEL == BOARD_TDECK
+      #define IS_ESP32S3 true
+      #define HAS_DISPLAY false
+      #define DISPLAY TFT // to be tested...
+      #define HAS_CONSOLE false
+      #define HAS_BLUETOOTH false
+      #define HAS_BLE true
+      #define HAS_PMU true
+      #define HAS_NP false
+      #define HAS_SD false
+      #define HAS_EEPROM true
+
+      #define HAS_INPUT true
+      #define HAS_SLEEP true
+      #define PIN_WAKEUP GPIO_NUM_0
+      #define WAKEUP_LEVEL 0
+
+      const int pin_poweron = 10;
+      const int pin_btn_usr1 = 0;
+      
+      const int SD_MISO = 38;
+      const int SD_MOSI = 41;
+      const int SD_CLK = 40;
+      const int SD_CS = 39;
+
+      const int DISPLAY_DC = 11;
+      const int DISPLAY_CS = 12;
+      const int DISPLAY_MISO = 38;
+      const int DISPLAY_MOSI = 41;
+      const int DISPLAY_CLK = 40;
+      const int DISPLAY_BL_PIN = 42;
+
+      #define INTERFACE_COUNT 1
+
+      const uint8_t interfaces[INTERFACE_COUNT] = {SX1262};
+      const bool interface_cfg[INTERFACE_COUNT][3] = { 
+                    // SX1262
+          {
+              false, // DEFAULT_SPI
+              true, // HAS_TCXO
+              true  // DIO2_AS_RF_SWITCH
+          }, 
+      };
+      const uint8_t interface_pins[INTERFACE_COUNT][10] = { 
+                  // SX1262
+          {
+               9, // pin_ss
+              40, // pin_sclk
+              41, // pin_mosi
+              38, // pin_miso
+              13, // pin_busy
+              45, // pin_dio
+              17, // pin_reset
+              -1, // pin_txen
+              -1, // pin_rxen
+              -1  // pin_tcxo_enable
+          }
+      };
+
+      #if HAS_NP == false
+        #if defined(EXTERNAL_LEDS)
+          const int pin_led_rx = 43;
+          const int pin_led_tx = 43;
+        #else
+          const int pin_led_rx = 43;
+          const int pin_led_tx = 43;
+        #endif
+      #endif
+
+    #elif BOARD_MODEL == BOARD_TBEAM_S_V1
+      #define IS_ESP32S3 true
+      #define OCP_TUNED 0x38
+
+      #define HAS_DISPLAY true
+      #define DISPLAY MONO_OLED
+      #define HAS_CONSOLE true
+      #define HAS_BLUETOOTH false
+      #define HAS_BLE true
+      #define HAS_PMU true
+      #define HAS_NP false
+      #define HAS_SD false
+      #define HAS_EEPROM true
+
+      #define HAS_INPUT true
+      #define HAS_SLEEP false
+      
+      #define PMU_IRQ 40
+      #define I2C_SCL 41
+      #define I2C_SDA 42
+
+      const int pin_btn_usr1 = 0;
+      
+      const int SD_MISO = 37;
+      const int SD_MOSI = 35;
+      const int SD_CLK = 36;
+      const int SD_CS = 47;
+
+      const int IMU_CS = 34;
+
+      #define INTERFACE_COUNT 1
+
+      const uint8_t interfaces[INTERFACE_COUNT] = {SX1262};
+      const bool interface_cfg[INTERFACE_COUNT][3] = { 
+                    // SX1262
+          {
+              false, // DEFAULT_SPI
+              true, // HAS_TCXO
+              true  // DIO2_AS_RF_SWITCH
+          }, 
+      };
+      const uint8_t interface_pins[INTERFACE_COUNT][10] = { 
+                  // SX1262
+          {
+              10, // pin_ss
+              12, // pin_sclk
+              11, // pin_mosi
+              13, // pin_miso
+               4, // pin_busy
+               1, // pin_dio
+               5, // pin_reset
+              -1, // pin_txen
+              -1, // pin_rxen
+              -1  // pin_tcxo_enable
+          }
+      };
+
+      #if HAS_NP == false
+        #if defined(EXTERNAL_LEDS)
+          const int pin_led_rx = 43;
+          const int pin_led_tx = 43;
+        #else
+          const int pin_led_rx = 43;
+          const int pin_led_tx = 43;
+        #endif
+      #endif
 
     #elif BOARD_MODEL == BOARD_E22_ESP32
       #define HAS_DISPLAY true
       #define DISPLAY OLED
+      // currently there is only support for using one Bluetooth type,
+      // Bluetooth has been chosen over BLE as it is less experimental
       #define HAS_BLUETOOTH true
-      #define HAS_BLE true
+      //#define HAS_BLE true 
       #define HAS_CONSOLE true
       #define HAS_SD false
       #define HAS_EEPROM true
@@ -772,7 +935,7 @@
       const bool interface_cfg[INTERFACE_COUNT][3] = { 
                     // SX1262
           {
-              true, // DEFAULT_SPI
+              false, // DEFAULT_SPI
               true, // HAS_TCXO
               true  // DIO2_AS_RF_SWITCH
           }, 
@@ -792,144 +955,113 @@
               -1  // pin_tcxo_enable
           }
       };
-
-    #elif BOARD_MODEL == BOARD_TDECK
+ #elif BOARD_MODEL == BOARD_XIAO_S3
       #define IS_ESP32S3 true
-      #define MODEM SX1262
-      #define DIO2_AS_RF_SWITCH true
-      #define HAS_BUSY true
-      #define HAS_TCXO true
 
-      #define HAS_DISPLAY false
-      #define HAS_CONSOLE false
+      #define HAS_DISPLAY true
+      #define DISPLAY OLED
+      //#define HAS_CONSOLE true
       #define HAS_BLUETOOTH false
       #define HAS_BLE true
-      #define HAS_PMU true
+      //#define HAS_PMU true
       #define HAS_NP false
       #define HAS_SD false
       #define HAS_EEPROM true
 
       #define HAS_INPUT true
       #define HAS_SLEEP true
-      #define PIN_WAKEUP GPIO_NUM_0
+      #define PIN_WAKEUP GPIO_NUM_21
       #define WAKEUP_LEVEL 0
 
-      const int pin_poweron = 10;
-      const int pin_btn_usr1 = 0;
+      #define INTERFACE_COUNT 1
 
-      const int pin_cs = 9;
-      const int pin_reset = 17;
-      const int pin_sclk = 40;
-      const int pin_mosi = 41;
-      const int pin_miso = 38;
-      const int pin_tcxo_enable = -1;
-      const int pin_dio = 45;
-      const int pin_busy = 13;
-      
-      const int SD_MISO = 38;
-      const int SD_MOSI = 41;
-      const int SD_CLK = 40;
-      const int SD_CS = 39;
+//      #define PMU_IRQ 40
+//      #define I2C_SCL 41
+//      #define I2C_SDA 42
 
-      const int DISPLAY_DC = 11;
-      const int DISPLAY_CS = 12;
-      const int DISPLAY_MISO = 38;
-      const int DISPLAY_MOSI = 41;
-      const int DISPLAY_CLK = 40;
-      const int DISPLAY_BL_PIN = 42;
+      // Wio-SX1262 button pulls down GPIO21
+      // THis is shared with the Yellow LED
+      // on the ESP32S3 (also active Low)
+      const int pin_btn_usr1 = 21;
 
+      const uint8_t interfaces[INTERFACE_COUNT] = {SX1262};
+      const bool interface_cfg[INTERFACE_COUNT][3] = { 
+                    // SX1262
+          {
+              true, // DEFAULT_SPI
+              true, // HAS_TCXO
+              true  // DIO2_AS_RF_SWITCH
+          }, 
+      };
+      const int8_t interface_pins[INTERFACE_COUNT][10] = { 
+                  // SX1262
+          {
+              41, // pin_ss
+              7, // pin_sclk
+              9, // pin_mosi
+              8, // pin_miso
+              40, // pin_busy
+              39, // pin_dio
+              42, // pin_reset
+              -1, // pin_txen
+              -1, // pin_rxen
+              -1  // pin_tcxo_enable
+          }
+      };
+
+//      const int SD_MISO = 37;
+//      const int SD_MOSI = 35;
+//      const int SD_CLK = 36;
+//      const int SD_CS = 47;
+
+//      const int IMU_CS = 34;
+
+      // HAS LED/tx on Wio board - 48 Hi/ON
+      // LED 21 on ESP board - Lo/ON/Yellow
+      // shared with button input.
       #if HAS_NP == false
         #if defined(EXTERNAL_LEDS)
-          const int pin_led_rx = 43;
-          const int pin_led_tx = 43;
+          const int pin_led_rx = 48;
+          const int pin_led_tx = 48; //47;
         #else
-          const int pin_led_rx = 43;
-          const int pin_led_tx = 43;
+          const int pin_led_rx = 48;
+          const int pin_led_tx = 48; //47;
         #endif
       #endif
-
-    #elif BOARD_MODEL == BOARD_TBEAM_S_V1
-      #define IS_ESP32S3 true
-      #define MODEM SX1262
-      #define DIO2_AS_RF_SWITCH true
-      #define HAS_BUSY true
-      #define HAS_TCXO true
-
-      #define HAS_DISPLAY true
-      #define HAS_CONSOLE true
-      #define HAS_BLUETOOTH false
-      #define HAS_BLE true
-      #define HAS_PMU true
-      #define HAS_NP false
-      #define HAS_SD false
-      #define HAS_EEPROM true
-
-      #define HAS_INPUT true
-      #define HAS_SLEEP false
-      
-      #define PMU_IRQ 40
-      #define I2C_SCL 41
-      #define I2C_SDA 42
-
-      const int pin_btn_usr1 = 0;
-
-      const int pin_cs = 10;
-      const int pin_reset = 5;
-      const int pin_sclk = 12;
-      const int pin_mosi = 11;
-      const int pin_miso = 13;
-      const int pin_tcxo_enable = -1;
-      const int pin_dio = 1;
-      const int pin_busy = 4;
-      
-      const int SD_MISO = 37;
-      const int SD_MOSI = 35;
-      const int SD_CLK = 36;
-      const int SD_CS = 47;
-
-      const int IMU_CS = 34;
-
-      #if HAS_NP == false
-        #if defined(EXTERNAL_LEDS)
-          const int pin_led_rx = 43;
-          const int pin_led_tx = 43;
-        #else
-          const int pin_led_rx = 43;
-          const int pin_led_tx = 43;
-        #endif
-      #endif
-  #endif
-
+    #else
+      #error An unsupported ESP32 board was selected. Cannot compile RNode firmware.
+    #endif
   
   #elif MCU_VARIANT == MCU_NRF52
+    #define CONFIG_UART_BUFFER_SIZE 6144
+    #define CONFIG_QUEUE_0_SIZE 6144
+    #define CONFIG_QUEUE_MAX_LENGTH 200
+
      #if BOARD_MODEL == BOARD_TECHO
-      #define VALIDATE_FIRMWARE false
+      #define _PINNUM(port, pin) ((port) * 32 + (pin))
       #define HAS_INPUT true
-      //#define GPS_BAUD_RATE 115200
-      //#define PIN_GPS_TX 41
-      //#define PIN_GPS_RX 40
       #define EEPROM_SIZE 296
       #define EEPROM_OFFSET EEPROM_SIZE-EEPROM_RESERVED
-      //#define HAS_EEPROM true
-      //#define HAS_SD true
+      #define HAS_EEPROM false
+      #define HAS_SD false
       #define HAS_DISPLAY true
       #define DISPLAY EINK_BW
       #define DISPLAY_MODEL GxEPD2_154_D67
-      //#define HAS_CONSOLE true
-      //#define HAS_TXCO true
-      //#define HAS_BLE true
-      //#define HAS_PMU true
-      #define CONFIG_UART_BUFFER_SIZE 40000
+      #define BLE_MANUFACTURER "LilyGO"
+      #define BLE_MODEL "T-Echo"
+      #define HAS_CONSOLE false
+      #define HAS_BLE true
+      #define HAS_PMU true
+      #define CONFIG_UART_BUFFER_SIZE 32768
       #define CONFIG_QUEUE_0_SIZE 6144
       #define CONFIG_QUEUE_MAX_LENGTH 200
-      //#define BLE_MANUFACTURER "LilyGO"
-      //#define BLE_MODEL "T-Echo"
       #define INTERFACE_COUNT 1
       //#define I2C_SDA 26
       //#define I2C_SCL 27
       #define CONFIG_QUEUE_1_SIZE 40000
+      #define HAS_BACKLIGHT true
       // first interface in list is the primary
-      const uint8_t interfaces[INTERFACE_COUNT] = {SX126X};
+      const uint8_t interfaces[INTERFACE_COUNT] = {SX1262};
       const bool interface_cfg[INTERFACE_COUNT][3] = { 
                   // SX1262
           {
@@ -1008,7 +1140,7 @@
       #define CONFIG_UART_BUFFER_SIZE 40000 // \todo, does it have to be this big?
 
       // first interface in list is the primary
-      const uint8_t interfaces[INTERFACE_COUNT] = {SX126X, SX128X};
+      const uint8_t interfaces[INTERFACE_COUNT] = {SX1262, SX1280};
       const bool interface_cfg[INTERFACE_COUNT][3] = { 
                     // SX1262
           {
@@ -1061,9 +1193,121 @@
       const int pin_btn_usr1 = 9;
       const int pin_led_rx = LED_BLUE;
       const int pin_led_tx = LED_GREEN;
+
+    #elif BOARD_MODEL == BOARD_HELTEC_T114
+      #define HAS_EEPROM false
+      #define HAS_DISPLAY true
+      #define DISPLAY TFT
+      #define DISPLAY_SCALE_OVERRIDE true
+      #define DISPLAY_SCALE 2
+      #define HAS_BLUETOOTH false
+      #define HAS_BLE true
+      #define HAS_CONSOLE false
+      #define HAS_PMU true
+      #define HAS_NP true
+      #define HAS_SD false
+      #define HAS_TCXO true
+      #define HAS_BUSY true
+      #define HAS_INPUT true
+      #define HAS_SLEEP true
+      #define CONFIG_UART_BUFFER_SIZE 6144
+      #define CONFIG_QUEUE_SIZE 6144
+      #define CONFIG_QUEUE_MAX_LENGTH 200
+      #define EEPROM_SIZE 296
+      #define EEPROM_OFFSET EEPROM_SIZE-EEPROM_RESERVED
+      #define BLE_MANUFACTURER "Heltec"
+      #define BLE_MODEL "T114"
+
+      #define PIN_T114_ADC_EN 6
+      #define PIN_VEXT_EN 21
+
+      // LED
+      #define LED_T114_GREEN 3
+      #define PIN_T114_LED 14
+      #define NP_M 1
+      const int pin_np = PIN_T114_LED;
+
+
+      // pins for buttons on Heltec T114
+      const int pin_btn_usr1 = 42;
+
+      const int pin_led_rx = 35;
+      const int pin_led_tx = 35;
+
+      #define PIN_T114_TFT_BLGT 15
+      #define PIN_T114_TFT_EN 3
+
+      // pins for ST7789 display on Heltec T114
+      const int DISPLAY_DC = 12;
+      const int DISPLAY_CS = 11;
+      const int DISPLAY_MISO = 11; // not connected
+      const int DISPLAY_MOSI = 9;
+      const int DISPLAY_CLK = 8;
+      const int DISPLAY_BL_PIN = PIN_T114_TFT_BLGT;
+      const int DISPLAY_RST = 2;
+
+      #define INTERFACE_COUNT 1
+
+      const uint8_t interfaces[INTERFACE_COUNT] = {SX1262};
+      const bool interface_cfg[INTERFACE_COUNT][3] = { 
+                    // SX1262
+          {
+              false, // DEFAULT_SPI
+              true, // HAS_TCXO
+              true  // DIO2_AS_RF_SWITCH
+          }
+      };
+      const int8_t interface_pins[INTERFACE_COUNT][10] = { 
+                  // SX1262
+          {
+              24, // pin_ss
+              19, // pin_sclk
+              22, // pin_mosi
+              23, // pin_miso
+              17, // pin_busy
+              20, // pin_dio
+              25, // pin_reset
+              -1, // pin_txen
+              -1, // pin_rxen
+              -1  // pin_tcxo_enable
+          }
+      };
+
+      #if BOARD_VARIANT == MODEL_CB
+      #define HAS_GPS true
+      #define GPS_BAUD_RATE 9600
+      #define PIN_GPS_RX 37
+      #define PIN_GPS_TX 39 
+      #endif
     #else
       #error An unsupported nRF board was selected. Cannot compile RNode firmware.
     #endif
 
+  #endif
+
+  #ifndef DISPLAY_SCALE
+    #define DISPLAY_SCALE 1
+  #endif
+
+  #ifndef HAS_BUSY
+    const int pin_busy = -1;
+  #endif
+
+  #ifndef LED_ON
+    #define LED_ON HIGH
+  #endif
+  
+  #ifndef LED_OFF
+    #define LED_OFF LOW
+  #endif
+
+  // Default OCP value if not specified
+  // in board configuration
+  #ifndef OCP_TUNED
+    #define OCP_TUNED 0x38
+  #endif
+
+  #ifndef NP_M
+    #define NP_M 0.15
   #endif
 #endif

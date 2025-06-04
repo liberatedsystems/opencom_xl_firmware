@@ -5,6 +5,7 @@
 // Obviously still under the MIT license.
 
 #include "Radio.hpp"
+#include "src/misc/ModemISR.h"
 
 #if PLATFORM == PLATFORM_ESP32 
   #if defined(ESP32) and !defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -91,37 +92,12 @@
 extern FIFOBuffer packet_rdy_interfaces;
 extern RadioInterface* interface_obj[];
 
-// ISRs cannot provide parameters to the functions they call. Since we have
-// multiple interfaces, we have to read each dio0 pin for each one and see
-// which one is high. We can then use the index of this pin in the 2D array to
-// signal the correct interface to the main loop 
-void ISR_VECT onDio0Rise() {
-    BaseType_t int_status = taskENTER_CRITICAL_FROM_ISR();
-    for (int i = 0; i < INTERFACE_COUNT; i++) {
-        if (digitalRead(interface_pins[i][5]) == HIGH) {
-            if (interface_obj[i]->getPacketValidity()) {
-                interface_obj[i]->handleDio0Rise();
-            }
-            if (interfaces[i] == SX128X) {
-                // On the SX1280, there is a bug which can cause the busy line
-                // to remain high if a high amount of packets are received when
-                // in continuous RX mode. This is documented as Errata 16.1 in
-                // the SX1280 datasheet v3.2 (page 149)
-                // Therefore, the modem is set into receive mode each time a packet is received.
-                interface_obj[i]->receive();
-            }
-            break;
-        }
-    }
-    taskEXIT_CRITICAL_FROM_ISR(int_status);
-}
-
 sx126x::sx126x(uint8_t index, SPIClass* spi, bool tcxo, bool dio2_as_rf_switch, int ss, int sclk, int mosi, int miso, int reset, int dio0, int busy, int rxen) :
   RadioInterface(index),
     _spiSettings(8E6, MSBFIRST, SPI_MODE0), _spiModem(spi), _ss(ss),
     _sclk(sclk), _mosi(mosi), _miso(miso), _reset(reset), _dio0(dio0),
-    _busy(busy), _rxen(rxen), _frequency(0), _sf(0x07), _bw(0x04),
-    _cr(0x01), _ldro(0x00), _packetIndex(0), _implicitHeaderMode(0),
+    _busy(busy), _rxen(rxen), _frequency(0), _bw(0x04),
+    _cr(0x01), _packetIndex(0), _implicitHeaderMode(0),
     _payloadLength(255), _crcMode(1), _fifo_tx_addr_ptr(0),
     _fifo_rx_addr_ptr(0), _preinit_done(false), _tcxo(tcxo),
     _dio2_as_rf_switch(dio2_as_rf_switch)
@@ -217,12 +193,11 @@ void sx126x::loraMode() {
 
 void sx126x::waitOnBusy() {
     unsigned long time = millis();
-    while (digitalRead(_busy) == HIGH)
-    {
-        if (millis() >= (time + 100)) {
-            break;
+    if (_busy != -1) {
+        while (digitalRead(_busy) == HIGH)
+        {
+            if (millis() >= (time + 100)) { break; }
         }
-        // do nothing
     }
 }
 
@@ -275,11 +250,7 @@ void sx126x::writeBuffer(const uint8_t* buffer, size_t size)
     _spiModem->transfer(OP_FIFO_WRITE_6X);
     _spiModem->transfer(_fifo_tx_addr_ptr);
 
-    for (int i = 0; i < size; i++)
-    {
-        _spiModem->transfer(buffer[i]);
-        _fifo_tx_addr_ptr++;
-    }
+    for (int i = 0; i < size; i++) {_spiModem->transfer(buffer[i]); _fifo_tx_addr_ptr++;}
 
     _spiModem->endTransaction();
 
@@ -297,10 +268,7 @@ void sx126x::readBuffer(uint8_t* buffer, size_t size)
     _spiModem->transfer(_fifo_rx_addr_ptr);
     _spiModem->transfer(0x00);
 
-    for (int i = 0; i < size; i++)
-    {
-        buffer[i] = _spiModem->transfer(0x00);
-    }
+    for (int i = 0; i < size; i++) {buffer[i] = _spiModem->transfer(0x00);}
 
     _spiModem->endTransaction();
 
@@ -308,7 +276,7 @@ void sx126x::readBuffer(uint8_t* buffer, size_t size)
 }
 
 void sx126x::setModulationParams(uint8_t sf, uint8_t bw, uint8_t cr, int ldro) {
-  // because there is no access to these registers on the sx1262, we have
+  // Because there is no access to these registers on the sx1262, we have
   // to set all these parameters at once or not at all.
   uint8_t buf[8];
 
@@ -327,7 +295,7 @@ void sx126x::setModulationParams(uint8_t sf, uint8_t bw, uint8_t cr, int ldro) {
 }
 
 void sx126x::setPacketParams(uint32_t preamble, uint8_t headermode, uint8_t length, uint8_t crc) {
-  // because there is no access to these registers on the sx1262, we have
+  // Because there is no access to these registers on the sx1262, we have
   // to set all these parameters at once or not at all.
   uint8_t buf[9];
 
@@ -374,27 +342,11 @@ void sx126x::calibrate(void) {
 void sx126x::calibrate_image(uint32_t frequency) {
   uint8_t image_freq[2] = {0};
 
-  if (frequency >= 430E6 && frequency <= 440E6) {
-    image_freq[0] = 0x6B;
-    image_freq[1] = 0x6F;
-  }
-  else if (frequency >= 470E6 && frequency <= 510E6) {
-    image_freq[0] = 0x75;
-    image_freq[1] = 0x81;
-  }
-  else if (frequency >= 779E6 && frequency <= 787E6) {
-    image_freq[0] = 0xC1;
-    image_freq[1] = 0xC5;
-  }
-  else if (frequency >= 863E6 && frequency <= 870E6) {
-    image_freq[0] = 0xD7;
-    image_freq[1] = 0xDB;
-  }
-  else if (frequency >= 902E6 && frequency <= 928E6) {
-    image_freq[0] = 0xE1;
-    image_freq[1] = 0xE9;
-  }
-
+  if (frequency >= 430E6 && frequency <= 440E6) { image_freq[0] = 0x6B; image_freq[1] = 0x6F; }
+  else if (frequency >= 470E6 && frequency <= 510E6) { image_freq[0] = 0x75; image_freq[1] = 0x81; }
+  else if (frequency >= 779E6 && frequency <= 787E6) { image_freq[0] = 0xC1; image_freq[1] = 0xC5; }
+  else if (frequency >= 863E6 && frequency <= 870E6) { image_freq[0] = 0xD7; image_freq[1] = 0xDB; }
+  else if (frequency >= 902E6 && frequency <= 928E6) { image_freq[0] = 0xE1; image_freq[1] = 0xE9; }
   executeOpcode(OP_CALIBRATE_IMAGE_6X, image_freq, 2);
   waitOnBusy();
 }
@@ -403,9 +355,7 @@ int sx126x::begin()
 {
   reset();
 
-  if (_busy != -1) {
-      pinMode(_busy, INPUT);
-  }
+  if (_busy != -1) { pinMode(_busy, INPUT); }
 
   if (!_preinit_done) {
     if (!preInit()) {
@@ -413,9 +363,7 @@ int sx126x::begin()
     }
   }
 
-  if (_rxen != -1) {
-      pinMode(_rxen, OUTPUT);
-  }
+  if (_rxen != -1) { pinMode(_rxen, OUTPUT); }
 
   calibrate();
   calibrate_image(_frequency);
@@ -502,13 +450,17 @@ int sx126x::endPacket()
 
     executeOpcodeRead(OP_GET_IRQ_STATUS_6X, buf, 2);
 
-    // wait for TX done
-    while ((buf[1] & IRQ_TX_DONE_MASK_6X) == 0) {
+    // Wait for TX done
+    bool timed_out = false;
+    uint32_t w_timeout = millis()+(calculateAirtime(_payloadLength)* MODEM_TIMEOUT_MULT);
+    while ((millis() < w_timeout) && ((buf[1] & IRQ_TX_DONE_MASK_6X) == 0)) {
         buf[0] = 0x00;
         buf[1] = 0x00;
         executeOpcodeRead(OP_GET_IRQ_STATUS_6X, buf, 2);
         yield();
     }
+
+    if (millis() > w_timeout) { timed_out = true; }
 
     // clear IRQ's
 
@@ -516,7 +468,7 @@ int sx126x::endPacket()
     mask[0] = 0x00;
     mask[1] = IRQ_TX_DONE_MASK_6X;
     executeOpcode(OP_CLEAR_IRQ_STATUS_6X, mask, 2);
-    return 1;
+    return !timed_out;
 }
 
 uint8_t sx126x::modemStatus() {
@@ -541,7 +493,6 @@ uint8_t sx126x::modemStatus() {
 
     return byte; 
 }
-
 
 uint8_t sx126x::currentRssiRaw() {
     uint8_t byte = 0;
@@ -615,9 +566,7 @@ int ISR_VECT sx126x::available()
 
 int ISR_VECT sx126x::read()
 {
-  if (!available()) {
-    return -1;
-  }
+  if (!available()) { return -1; }
 
   // if received new packet
   if (_packetIndex == 0) {
@@ -689,9 +638,9 @@ void sx126x::onReceive(void(*callback)(uint8_t, int))
     _spiModem->usingInterrupt(digitalPinToInterrupt(_dio0));
 #endif
     // make function available
-    extern void onDio0Rise();
+    extern void (*onIntRise[INTERFACE_COUNT])(void);
 
-    attachInterrupt(digitalPinToInterrupt(_dio0), onDio0Rise, RISING);
+    attachInterrupt(digitalPinToInterrupt(_dio0), onIntRise[_index], RISING);
   } else {
     detachInterrupt(digitalPinToInterrupt(_dio0));
 #ifdef SPI_HAS_NOTUSINGINTERRUPT
@@ -927,7 +876,7 @@ void sx126x::setPreambleLength(long length)
 
 void sx126x::setSyncWord(uint16_t sw)
 {
-  // TODO: Fix
+    // TODO: Why was this hardcoded instead of using the config value?
     // writeRegister(REG_SYNC_WORD_MSB_6X, (sw & 0xFF00) >> 8);
     // writeRegister(REG_SYNC_WORD_LSB_6X, sw & 0x00FF);
     writeRegister(REG_SYNC_WORD_MSB_6X, 0x14);
@@ -946,7 +895,7 @@ void sx126x::disableCrc()
     setPacketParams(_preambleLength, _implicitHeaderMode, _payloadLength, _crcMode);
 }
 
-byte sx126x::random()
+uint8_t sx126x::random()
 {
     return readRegister(REG_RANDOM_GEN_6X);
 }
@@ -1619,11 +1568,11 @@ sx128x::sx128x(uint8_t index, SPIClass* spi, bool tcxo, int ss, int sclk, int mo
     _spiSettings(8E6, MSBFIRST, SPI_MODE0),
     _spiModem(spi),
   _ss(ss), _sclk(sclk), _mosi(mosi), _miso(miso), _reset(reset), _dio0(dio0),
-  _busy(busy), _rxen(rxen), _txen(txen), _frequency(0), _sf(0x05),
+  _busy(busy), _rxen(rxen), _txen(txen), _frequency(0),
   _bw(0x34), _cr(0x01), _packetIndex(0), _implicitHeaderMode(0),
   _payloadLength(255), _crcMode(0), _fifo_tx_addr_ptr(0), _fifo_rx_addr_ptr(0),
   _rxPacketLength(0), _preinit_done(false),
-  _tcxo(tcxo), _txp_dc(55)
+  _tcxo(tcxo)
 {
   // overide Stream timeout value
   setTimeout(0);
@@ -1649,25 +1598,21 @@ bool sx128x::preInit() {
     _spiModem->begin();
   #endif
 
-  // check version (retry for up to 2 seconds)
+  // check version (retry for up to 500 ms)
   long start = millis();
 
   uint8_t version_msb;
   uint8_t version_lsb;
 
-  while (((millis() - start) < 2000) && (millis() >= start)) {
+  while (((millis() - start) < 500) && (millis() >= start)) {
 
       version_msb = readRegister(REG_FIRM_VER_MSB);
       version_lsb = readRegister(REG_FIRM_VER_LSB);
 
-      if ((version_msb == 0xB7 && version_lsb == 0xA9) || (version_msb == 0xB5 && version_lsb == 0xA9)) {
-          break;
-      }
+      if ((version_msb == 0xB7 && version_lsb == 0xA9) || (version_msb == 0xB5 && version_lsb == 0xA9)) { break; }
       delay(100);
   }
-  if ((version_msb != 0xB7 || version_lsb != 0xA9) && (version_msb != 0xB5 || version_lsb != 0xA9)) {
-      return false;
-  }
+  if ((version_msb != 0xB7 || version_lsb != 0xA9) && (version_msb != 0xB5 || version_lsb != 0xA9)) { return false; }
 
   _preinit_done = true;
   return true;
@@ -1695,9 +1640,7 @@ uint8_t ISR_VECT sx128x::singleTransfer(uint8_t opcode, uint16_t address, uint8_
     _spiModem->transfer(opcode);
     _spiModem->transfer((address & 0xFF00) >> 8);
     _spiModem->transfer(address & 0x00FF);
-    if (opcode == OP_READ_REGISTER_8X) {
-        _spiModem->transfer(0x00);
-    }
+    if (opcode == OP_READ_REGISTER_8X) { _spiModem->transfer(0x00); }
     response = _spiModem->transfer(value);
     _spiModem->endTransaction();
 
@@ -1708,38 +1651,17 @@ uint8_t ISR_VECT sx128x::singleTransfer(uint8_t opcode, uint16_t address, uint8_
 
 void sx128x::rxAntEnable()
 {
-    if (_txen != -1) {
-        #if BOARD_VARIANT == MODEL_13 || BOARD_VARIANT == MODEL_21
-        analogWrite(_txen, 0);
-        #else
-        digitalWrite(_txen, LOW);
-        #endif
-    }
-    if (_rxen != -1) {
-        digitalWrite(_rxen, HIGH);
-    }
+    if (_txen != -1) { digitalWrite(_txen, LOW); }
+    if (_rxen != -1) { digitalWrite(_rxen, HIGH); }
 }
 
 void sx128x::txAntEnable()
 {
-    if (_txen != -1) {
-        #if BOARD_VARIANT == MODEL_13 || BOARD_VARIANT == MODEL_21
-        // RAK4631 with WisBlock SX1280 module (LIBSYS002)
-        // This board needs to use a PWM input in order to scale the power of
-        // the PA output. Undocumented by NiceRF, they have been contacted for
-        // comment. (March 2025)
-        analogWrite(_txen, _txp_dc);
-        #else
-        digitalWrite(_txen, HIGH);
-        #endif
-    }
-    if (_rxen != -1) {
-        digitalWrite(_rxen, LOW);
-    }
+    if (_txen != -1) { digitalWrite(_txen, HIGH); }
+    if (_rxen != -1) { digitalWrite(_rxen, LOW); }
 }
 
 void sx128x::loraMode() {
-    // enable lora mode on the SX1262 chip
     uint8_t mode = MODE_LONG_RANGE_MODE_8X;
     executeOpcode(OP_PACKET_TYPE_8X, &mode, 1);
 }
@@ -1748,10 +1670,7 @@ void sx128x::waitOnBusy() {
     unsigned long time = millis();
     while (digitalRead(_busy) == HIGH)
     {
-        if (millis() >= (time + 100)) {
-            break;
-        }
-        // do nothing
+        if (millis() >= (time + 100)) { break; }
     }
 }
 
@@ -1846,37 +1765,38 @@ void sx128x::setModulationParams(uint8_t sf, uint8_t bw, uint8_t cr) {
   buf[2] = cr; 
   executeOpcode(OP_MODULATION_PARAMS_8X, buf, 3);
 
-  if (sf <= 6) {
-      writeRegister(0x925, 0x1E);
-  } else if (sf <= 8) {
-      writeRegister(0x925, 0x37);
-  } else if (sf >= 9) {
-      writeRegister(0x925, 0x32);
-  }
+  if (sf <= 6) { writeRegister(0x925, 0x1E); } 
+  else if (sf <= 8) { writeRegister(0x925, 0x37); } 
+  else if (sf >= 9) { writeRegister(0x925, 0x32); }
   writeRegister(0x093C, 0x1);
 }
 
-void sx128x::setPacketParams(uint32_t preamble, uint8_t headermode, uint8_t length, uint8_t crc) {
+void sx128x::setPacketParams(uint32_t target_preamble, uint8_t headermode, uint8_t length, uint8_t crc) {
   // because there is no access to these registers on the sx1280, we have
   // to set all these parameters at once or not at all.
   uint8_t buf[7];
-  // calculate exponent and mantissa values for modem
-  uint8_t e = 1;
-  uint8_t m = 1;
-  uint32_t preamblelen;
+  uint32_t calc_preamble;
 
-  while (e <= 15) {
-      while (m <= 15) {
-          preamblelen = m * (pow(2,e));
-          if (preamblelen >= preamble) break;
-          m++;
+  // Cap max preamble length
+  if (target_preamble >= 0xF000) target_preamble = 0xF000;
+
+  if (_last_preamble != target_preamble) {
+      _preamble_e = 1;
+      _preamble_m = 1;
+      // calculate exponent and mantissa values for modem
+      while (_preamble_e <= 15) {
+          while (_preamble_m <= 15) {
+              calc_preamble = _preamble_m * (pow(2,_preamble_e));
+              if (calc_preamble >= target_preamble - 4) break;
+              _preamble_m++;
+          }
+          if (calc_preamble >= target_preamble - 4) break;
+          _preamble_m = 1;
+          _preamble_e++;
       }
-      if (preamblelen >= preamble) break;
-      m = 0;
-      e++;
   }
 
-  buf[0] = (e << 4) | m;
+  buf[0] = (_preamble_e << 4) | _preamble_m;
   buf[1] = headermode;
   buf[2] = length;
   buf[3] = crc;
@@ -1887,9 +1807,11 @@ void sx128x::setPacketParams(uint32_t preamble, uint8_t headermode, uint8_t leng
   buf[6] = 0x00; 
 
   executeOpcode(OP_PACKET_PARAMS_8X, buf, 7);
+
+  _last_preamble = target_preamble;
 }
 
-int sx128x::begin()
+void sx128x::reset()
 {
   if (_reset != -1) {
     pinMode(_reset, OUTPUT);
@@ -1900,6 +1822,11 @@ int sx128x::begin()
     digitalWrite(_reset, HIGH);
     delay(10);
   }
+}
+
+int sx128x::begin()
+{
+    reset();
 
   if (_rxen != -1) {
       pinMode(_rxen, OUTPUT);
@@ -1961,11 +1888,8 @@ int sx128x::beginPacket(int implicitHeader)
   // put in standby mode
   standby();
 
-  if (implicitHeader) {
-    implicitHeaderMode();
-  } else {
-    explicitHeaderMode();
-  }
+  if (implicitHeader) { implicitHeaderMode(); } 
+  else { explicitHeaderMode(); }
 
   _payloadLength = 0;
   _fifo_tx_addr_ptr = 0;
@@ -1991,14 +1915,17 @@ int sx128x::endPacket()
 
   executeOpcodeRead(OP_GET_IRQ_STATUS_8X, buf, 2);
 
-  // wait for TX done
-  while ((buf[1] & IRQ_TX_DONE_MASK_8X) == 0) {
+  // Wait for TX done
+  bool timed_out = false;
+  uint32_t w_timeout = millis()+(calculateAirtime(_payloadLength)* MODEM_TIMEOUT_MULT);
+  while ((millis() < w_timeout) && ((buf[1] & IRQ_TX_DONE_MASK_8X) == 0)) {
     buf[0] = 0x00;
     buf[1] = 0x00;
     executeOpcodeRead(OP_GET_IRQ_STATUS_8X, buf, 2);
     yield();
   }
 
+  if (millis() > w_timeout) { timed_out = true; }
 
   // clear IRQ's
 
@@ -2006,7 +1933,7 @@ int sx128x::endPacket()
   mask[0] = 0x00;
   mask[1] = IRQ_TX_DONE_MASK_8X;
   executeOpcode(OP_CLEAR_IRQ_STATUS_8X, mask, 2);
-  return 1;
+  return !timed_out;
 }
 
 uint8_t sx128x::modemStatus() {
@@ -2033,7 +1960,6 @@ uint8_t sx128x::modemStatus() {
 
     return byte;
 }
-
 
 uint8_t sx128x::currentRssiRaw() {
     uint8_t byte = 0;
@@ -2124,9 +2050,7 @@ int ISR_VECT sx128x::read()
         }
         _fifo_rx_addr_ptr = rxbuf[1];
 
-        if (size > 255) {
-            size = 255;
-        }
+        if (size > 255) { size = 255; }
 
         readBuffer(_packet, size);
     }
@@ -2138,9 +2062,7 @@ int ISR_VECT sx128x::read()
 
 int sx128x::peek()
 {
-  if (!available()) {
-    return -1;
-  }
+  if (!available()) { return -1; }
 
   uint8_t b = _packet[_packetIndex];
   return b;
@@ -2189,9 +2111,9 @@ void sx128x::onReceive(void(*callback)(uint8_t, int))
 #endif
 
     // make function available
-    extern void onDio0Rise();
+    extern void (*onIntRise[INTERFACE_COUNT])(void);
 
-    attachInterrupt(digitalPinToInterrupt(_dio0), onDio0Rise, RISING);
+    attachInterrupt(digitalPinToInterrupt(_dio0), onIntRise[_index], RISING);
   } else {
     detachInterrupt(digitalPinToInterrupt(_dio0));
 #ifdef SPI_HAS_NOTUSINGINTERRUPT
@@ -2253,150 +2175,100 @@ void sx128x::disableTCXO() {
 
 void sx128x::setTxPower(int level, int outputPin) {
     uint8_t tx_buf[2];
-    #if BOARD_VARIANT == MODEL_13 || BOARD_VARIANT == MODEL_21
-    // RAK4631 with WisBlock SX1280 module (LIBSYS002) The following duty cycle
-    // values assume a battery is in use which has a maximum voltage supply of
-    // 4.2v (each case assumes 3.7v, except 15-20dBm to ensure legal compliance
-    // at all battery voltages), as per the specification for the RAK19001.
-    // Higher voltage batteries may cause your device to operate illegally due
-    // to the resulting increase in transmission power. Beware!
-
-    // TODO: in the future it may be possible to read the battery voltage and
-    // compensate for the lower voltage causing a lower transmit power. Need to
-    // look into this.
-
-    if (level > 25) {
-        level = 25;
-    } else if (level < 0) {
-        level = 0;
-    }
+    #if BOARD_VARIANT == MODEL_13 || BOARD_VARIANT == MODEL_14 || BOARD_VARIANT == MODEL_21
+    // RAK4631 with WisBlock SX1280 module (LIBSYS002 rev 1.3)
+    // Power range on this model is roughly -6 dBm to 20 dBm
+    if (level > 20) { level = 20; } 
+    else if (level < -6) { level = -6; }
 
     _txp = level;
 
     int reg_value;
 
     switch (level) {
+        case -6:
+            reg_value = -18; // -6.3 dBm
+            break;
+        case -5:
+            reg_value = -17; // -5.4 dBm
+            break;
+        case -4:
+            reg_value = -16; // -3.9 dBm
+            break;
+        case -3:
+            reg_value = -15; // -2.9 dBm
+            break;
+        case -2:
+            reg_value = -14; // -2 dBm
+            break;
+        case -1:
+            reg_value = -13; // CANNOT SET, BUG??
+            break;
         case 0:
-            reg_value = -18;
-            _txp_dc = 131;
+            reg_value = -12; // -0.4 dBm
             break;
         case 1:
-            reg_value = -16;
-            _txp_dc = 137;
+            reg_value = -10; // 1.1 dBm
             break;
         case 2:
-            reg_value = -15;
-            _txp_dc = 142;
+            reg_value = -9; // 2.4 dBm
             break;
         case 3:
-            reg_value = -14;
-            _txp_dc = 148;
+            reg_value = -8; // 3 dBm
             break;
         case 4:
-            reg_value = -13;
-            _txp_dc = 154;
+            reg_value = -7; // 4.1 dBm
             break;
         case 5:
-            reg_value = -12;
-            _txp_dc = 159;
+            reg_value = -6; // 5.1 dBm
             break;
         case 6:
-            reg_value = -11;
-            _txp_dc = 163;
+            reg_value = -5; // 6 dBm
             break;
         case 7:
-            reg_value = -9;
-            _txp_dc = 168;
+            reg_value = -4; // 7.3 dBm
             break;
         case 8:
-            reg_value = -8;
-            _txp_dc = 174;
+            reg_value = -3; // 8.3 dBm
             break;
         case 9:
-            reg_value = -7;
-            _txp_dc = 178;
+            reg_value = -2; // 9.2 dBm
             break;
         case 10:
-            reg_value = -6;
-            _txp_dc = 184;
+            reg_value = -1; // 10.3 dBm
             break;
         case 11:
-            reg_value = -5;
-            _txp_dc = 189;
+            reg_value = 0; // 11.4 dBm
             break;
         case 12:
-            reg_value = -4;
-            _txp_dc = 194;
+            reg_value = 1; // 12.4 dBm
             break;
         case 13:
-            reg_value = -3;
-            _txp_dc = 199;
+            reg_value = 2; // 13.5 dBm
             break;
         case 14:
-            reg_value = -2;
-            _txp_dc = 199;
+            reg_value = 2; // 13.5 dBm
             break;
         case 15:
-            reg_value = -1;
-            // Capped to ensure it doesn't exceed 15dBm 
-            _txp_dc = 202;
+            reg_value = 3; // 14.3 dBm
             break;
         case 16:
-            reg_value = 0;
-            // Capped to ensure it doesn't exceed 16dBm 
-            _txp_dc = 208;
+            reg_value = 5; // 16.4 dBm
             break;
         case 17:
-            reg_value = 1;
-            // Capped to ensure it doesn't exceed 17dBm 
-            _txp_dc = 214;
+            reg_value = 6; // 17.1 dBm
             break;
         case 18:
-            reg_value = 2;
-            // Capped to ensure it doesn't exceed 18dBm 
-            _txp_dc = 222;
+            reg_value = 8; // 18.5 dBm
             break;
         case 19:
-            reg_value = 3;
-            // Capped to ensure it doesn't exceed 19dBm 
-            _txp_dc = 228;
+            reg_value = 10; // 19.2 dBm
             break;
         case 20:
-            reg_value = 4;
-            // Capped to ensure it doesn't exceed 20dBm 
-            _txp_dc = 234;
-            break;
-        case 21:
-            reg_value = 5;
-            _txp_dc = 247;
-            break;
-        case 22:
-            reg_value = 6;
-            _txp_dc = 254;
-            break;
-        case 23:
-            reg_value = 7;
-            _txp_dc = 255;
-            break;
-        case 24:
-            reg_value = 8;
-            _txp_dc = 255;
-            break;
-        case 25:
-            reg_value = 9;
-            _txp_dc = 255;
-            break;
-        case 26:
-            reg_value = 12;
-            _txp_dc = 255;
-            break;
-        case 27:
-            reg_value = 13;
-            _txp_dc = 255;
+            reg_value = 13; // 20.1 dBm
             break;
         default:
             reg_value = -18;
-            _txp_dc = 131;
             break;
     }
 
@@ -2562,7 +2434,8 @@ uint32_t sx128x::getSignalBandwidth()
 }
 
 void sx128x::handleLowDataRate(){
-    // todo: do i need this??
+  if (_sf > 10) { _ldro = true; }
+  else          { _ldro = false; }
 }
 
 void sx128x::optimizeModemSensitivity(){
@@ -2571,15 +2444,10 @@ void sx128x::optimizeModemSensitivity(){
 
 void sx128x::setSignalBandwidth(uint32_t sbw)
 {
-      if (sbw <= 203.125E3) {
-          _bw = 0x34;
-      } else if (sbw <= 406.25E3) {
-          _bw = 0x26;
-      } else if (sbw <= 812.5E3) {
-          _bw = 0x18;
-      } else {
-          _bw = 0x0A;
-      }
+      if (sbw <= 203.125E3) { _bw = 0x34; } 
+      else if (sbw <= 406.25E3) { _bw = 0x26; } 
+      else if (sbw <= 812.5E3) { _bw = 0x18; } 
+      else { _bw = 0x0A; }
 
       setModulationParams(_sf, _bw, _cr);
 
@@ -2587,8 +2455,8 @@ void sx128x::setSignalBandwidth(uint32_t sbw)
   optimizeModemSensitivity();
 }
 
-void sx128x::setCodingRate4(int denominator)
-{
+void sx128x::setCodingRate4(int denominator) {
+  // TODO: add support for new interleaving scheme, see page 117 of sx1280 datasheet
   if (denominator < 5) {
     denominator = 5;
   } else if (denominator > 8) {

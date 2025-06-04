@@ -44,6 +44,7 @@
   #define CMD_STAT_CHTM   0x25
   #define CMD_STAT_PHYPRM 0x26
   #define CMD_STAT_BAT    0x27
+  #define CMD_STAT_CSMA   0x28
   #define CMD_BLINK       0x30
   #define CMD_RANDOM      0x40
 
@@ -51,12 +52,17 @@
   #define CMD_FB_READ     0x42
   #define CMD_FB_WRITE    0x43
   #define CMD_FB_READL    0x44
+  #define CMD_DISP_READ   0x66
   #define CMD_DISP_INT    0x45
   #define CMD_DISP_ADDR   0x63
   #define CMD_DISP_BLNK   0x64
+  #define CMD_DISP_ROT    0x67
+  #define CMD_DISP_RCND   0x68
   #define CMD_NP_INT      0x65
   #define CMD_BT_CTRL     0x46
+  #define CMD_BT_UNPAIR   0x70
   #define CMD_BT_PIN      0x62
+  #define CMD_DIS_IA      0x69
 
   #define CMD_BOARD       0x47
   #define CMD_PLATFORM    0x48
@@ -75,35 +81,16 @@
   #define ROM_UNLOCK_BYTE 0xF8
   #define CMD_RESET       0x55
   #define CMD_RESET_BYTE  0xF8
-  #define CMD_FW_LENGTH   0x65
 
   #define CMD_INTERFACES  0x64
+    
+  #define CMD_DATA        0x00
 
-  #define CMD_INT0_DATA   0x00
-  #define CMD_INT1_DATA   0x10
-  #define CMD_INT2_DATA   0x20
-  #define CMD_INT3_DATA   0x70
-  #define CMD_INT4_DATA   0x75
-  #define CMD_INT5_DATA   0x90
-  #define CMD_INT6_DATA   0xA0
-  #define CMD_INT7_DATA   0xB0
-  #define CMD_INT8_DATA   0xC0
-  #define CMD_INT9_DATA   0xD0
-  #define CMD_INT10_DATA  0xE0
-  #define CMD_INT11_DATA  0xF0
-
-  #define CMD_SEL_INT0    0x1E
-  #define CMD_SEL_INT1    0x1F
-  #define CMD_SEL_INT2    0x2F
-  #define CMD_SEL_INT3    0x74
-  #define CMD_SEL_INT4    0x7F
-  #define CMD_SEL_INT5    0x9F
-  #define CMD_SEL_INT6    0xAF
-  #define CMD_SEL_INT7    0xBF
-  #define CMD_SEL_INT8    0xCF
-  #define CMD_SEL_INT9    0xDF
-  #define CMD_SEL_INT10   0xEF
-  #define CMD_SEL_INT11   0xFF
+  #define CMD_SEL_INT     0x1F
+  #define CMD_LOG         0x80
+  #define CMD_TIME        0x81
+  #define CMD_MUX_CHAIN   0x82
+  #define CMD_MUX_DSCVR   0x83
 
   #define DETECT_REQ      0x73
   #define DETECT_RESP     0x46
@@ -123,6 +110,19 @@
   #define ERROR_QUEUE_FULL    0x04
   #define ERROR_MEMORY_LOW    0x05
   #define ERROR_MODEM_TIMEOUT 0x06
+
+  #define CMD_GPS         0xA0
+
+  #define GPS_CMD_LAT     0x00
+  #define GPS_CMD_LNG     0x01
+
+  // Serial logging
+  #define LOG_MSG         0x2F
+
+  #define MSG_INFO        0x01
+  #define MSG_ERR         0x02
+  #define MSG_DBG         0x03
+  #define MSG_TRACE       0x04
 
   // Serial framing variables
   size_t frame_len;

@@ -19,6 +19,10 @@
 #define PA_OUTPUT_RFO_PIN 0
 #define PA_OUTPUT_PA_BOOST_PIN 1
 
+// Default LoRa settings
+#define PHY_HEADER_LORA_SYMBOLS    20
+#define PHY_CRC_LORA_BITS          16
+
 // DCD
 #define STATUS_INTERVAL_MS 3
 #define DCD_SAMPLES 2500
@@ -46,6 +50,8 @@
 #define _e 2.71828183
 #define _S 12.5
 
+#define MODEM_TIMEOUT_MULT 1.5
+
 // Status flags
 const uint8_t SIG_DETECT = 0x01;
 const uint8_t SIG_SYNCED = 0x02;
@@ -71,7 +77,7 @@ public:
     // todo: in the future define _spiModem and _spiSettings from here for inheritence by child classes
     RadioInterface(uint8_t index) : _index(index), _radio_locked(false),
     _radio_online(false), _st_airtime_limit(0.0), _lt_airtime_limit(0.0),
-    _airtime_lock(false), _airtime(0.0), _longterm_airtime(0.0),
+    _airtime_lock(false), _airtime(0.0), _longterm_airtime(0.0), _last_packet_cost(0.0),
     _local_channel_util(0.0), _total_channel_util(0.0),
     _longterm_channel_util(0.0), _last_status_update(0),
      _stat_signal_detected(false), _stat_signal_synced(false),_stat_rx_ongoing(false), _last_dcd(0), 
@@ -80,7 +86,7 @@ public:
     _post_tx_yield_timeout(0), _csma_slot_ms(50), _csma_p(85), _csma_p_min(0.15),
     _csma_p_max(0.333), _csma_b_speed(0.15), _preambleLength(6), _lora_symbol_time_ms(0.0),
     _lora_symbol_rate(0.0), _lora_us_per_byte(0.0), _bitrate(0),
-     _packet{0}, _onReceive(NULL), _txp(0) {};
+     _packet{0}, _onReceive(NULL), _txp(0), _sf(0x05), _ldro(0) {};
     virtual int begin() = 0;
     virtual void end() = 0;
 
@@ -146,6 +152,36 @@ public:
     float getSTALock() { return _st_airtime_limit; };
     void setLTALock(float at) { _lt_airtime_limit = at; };
     float getLTALock() { return _lt_airtime_limit; };
+    float calculateAirtime(uint16_t written) {
+        float lora_symbols = 0;
+        float packet_cost_ms = 0.0;
+
+        if (interfaces[_index] == SX1276 || interfaces[_index] == SX1278) { 
+            lora_symbols += (8*written + PHY_CRC_LORA_BITS - 4*_sf + 8 + PHY_HEADER_LORA_SYMBOLS);
+            lora_symbols /=                          4*(_sf-2*_ldro);
+            lora_symbols *= getCodingRate4();
+            lora_symbols += _preambleLength + 0.25 + 8;
+            packet_cost_ms += lora_symbols * _lora_symbol_time_ms;
+        }
+        else if (interfaces[_index] == SX1262 || interfaces[_index] == SX1280) {
+            if (_sf < 7) {
+                lora_symbols += (8*written + PHY_CRC_LORA_BITS - 4*_sf + PHY_HEADER_LORA_SYMBOLS);
+                lora_symbols /=                              4*_sf;
+                lora_symbols *= getCodingRate4();
+                lora_symbols += _preambleLength + 2.25 + 8;
+                packet_cost_ms += lora_symbols * _lora_symbol_time_ms;
+
+            } else {
+                lora_symbols += (8*written + PHY_CRC_LORA_BITS - 4*_sf + 8 + PHY_HEADER_LORA_SYMBOLS);
+                lora_symbols /=                         4*(_sf-2*_ldro);
+                lora_symbols *= getCodingRate4();
+                lora_symbols += _preambleLength + 0.25 + 8;
+                packet_cost_ms += lora_symbols * _lora_symbol_time_ms;
+            }
+        }
+        _last_packet_cost = packet_cost_ms;
+        return packet_cost_ms;
+    }
     bool calculateALock() {
       _airtime_lock = false;
       if (_st_airtime_limit != 0.0 && _airtime >= _st_airtime_limit) {
@@ -313,6 +349,7 @@ protected:
     uint16_t _longterm_bins[AIRTIME_BINS] = {0};
     float _airtime;
     float _longterm_airtime;
+    float _last_packet_cost;
     float _local_channel_util;
     float _total_channel_util;
     float _longterm_channel_util;
@@ -339,6 +376,8 @@ protected:
     float _lora_symbol_rate;
     float _lora_us_per_byte;
     uint32_t _bitrate;
+    uint8_t _sf;
+    uint8_t _ldro;
   uint8_t _packet[255];
     void (*_onReceive)(uint8_t, int);
 };
@@ -347,6 +386,8 @@ class sx126x : public RadioInterface {
 public:
   sx126x(uint8_t index, SPIClass* spi, bool tcxo, bool dio2_as_rf_switch, int ss, int sclk, int mosi, int miso, int reset, int
           dio0, int busy, int rxen);
+
+  void reset();
 
   int begin();
   void end();
@@ -430,7 +471,6 @@ private:
   void handleLowDataRate();
   void optimizeModemSensitivity();
 
-  void reset(void);
   void calibrate(void);
   void calibrate_image(uint32_t frequency);
   bool getPacketValidity();
@@ -447,10 +487,8 @@ private:
   int _rxen;
   int _busy;
   uint32_t _frequency;
-  uint8_t _sf;
   uint8_t _bw;
   uint8_t _cr;
-  uint8_t _ldro;
   int _packetIndex;
   int _implicitHeaderMode;
   int _payloadLength;
@@ -551,7 +589,6 @@ private:
   int _packetIndex;
   int _implicitHeaderMode;
   bool _preinit_done;
-  uint8_t _sf;
   uint8_t _cr;
 };
 
@@ -561,6 +598,8 @@ public:
 
   int begin();
   void end();
+
+  void reset();
 
   int beginPacket(int implicitHeader = false);
   int endPacket();
@@ -658,7 +697,6 @@ private:
   int _busy;
   int _modem;
   uint32_t _frequency;
-  uint8_t _sf;
   uint8_t _bw;
   uint8_t _cr;
   int _packetIndex;
@@ -670,6 +708,8 @@ private:
   bool _preinit_done;
   int _rxPacketLength;
   bool _tcxo;
-  uint8_t _txp_dc;
+  uint8_t _preamble_e;
+  uint8_t _preamble_m;
+  uint32_t _last_preamble;
 };
 #endif

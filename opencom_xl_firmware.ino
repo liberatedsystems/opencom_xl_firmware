@@ -191,7 +191,6 @@ void setup() {
   // Create and configure interface objects
   for (uint8_t i = 0; i < INTERFACE_COUNT; i++) {
       switch (interfaces[i]) {
-          case SX126X:
           case SX1262:
           {
               sx126x* obj;
@@ -213,7 +212,6 @@ void setup() {
             break;
           }
 
-          case SX127X:
           case SX1276:
           case SX1278:
           {
@@ -234,7 +232,6 @@ void setup() {
             break;
           }
 
-          case SX128X:
           case SX1280:
           {
               sx128x* obj;
@@ -265,12 +262,9 @@ void setup() {
     // the configured modems cannot be initialised, do not boot
     for (int i = 0; i < INTERFACE_COUNT; i++) {
         switch (interfaces[i]) {
-            case SX126X:
             case SX1262:
-            case SX127X:
             case SX1276:
             case SX1278:
-            case SX128X:
             case SX1280:
                 selected_radio = interface_obj[i];
                 break;
@@ -353,12 +347,14 @@ void lora_receive(RadioInterface* radio) {
 }
 
 inline void kiss_write_packet(int index) {
-  // We need to convert the interface index to the command byte representation
-  uint8_t cmd_byte = getInterfaceCommandByte(index);
+  // Print index of interface the packet came from
+  serial_write(FEND);
+  serial_write(CMD_SEL_INT);
+  serial_write(index);
+  serial_write(FEND);
 
   serial_write(FEND);
-  // Add index of interface the packet came from
-  serial_write(cmd_byte);
+  serial_write(CMD_DATA);
 
   for (uint16_t i = 0; i < read_len[index]; i++) {
     #if MCU_VARIANT == MCU_NRF52
@@ -619,7 +615,7 @@ void flushQueue(RadioInterface* radio) {
   selected_radio->updateAirtime();
   queue_flushing = false;
   #if HAS_DISPLAY
-    display_tx = true;
+    display_tx[index] = true;
   #endif
 }
 
@@ -696,39 +692,27 @@ void transmit(RadioInterface* radio, uint16_t size) {
 
 void serialCallback(uint8_t sbyte) {
   if (IN_FRAME && sbyte == FEND && 
-            (command == CMD_INT0_DATA
-          || command == CMD_INT1_DATA
-          || command == CMD_INT2_DATA
-          || command == CMD_INT3_DATA
-          || command == CMD_INT4_DATA
-          || command == CMD_INT5_DATA
-          || command == CMD_INT6_DATA
-          || command == CMD_INT7_DATA
-          || command == CMD_INT8_DATA
-          || command == CMD_INT9_DATA
-          || command == CMD_INT10_DATA 
-          || command == CMD_INT11_DATA)) {
+            command == CMD_DATA) {
     IN_FRAME = false;
 
-    if (getInterfaceIndex(command) < INTERFACE_COUNT) {
-            uint8_t index = getInterfaceIndex(command);
-        if (!fifo16_isfull(&packet_starts[index]) && (queued_bytes[index] < (getQueueSize(index)))) {
-            uint16_t s = current_packet_start[index];
-            int32_t e = queue_cursor[index]-1; if (e == -1) e = (getQueueSize(index))-1;
+    if (interface < INTERFACE_COUNT) {
+        if (!fifo16_isfull(&packet_starts[interface]) && (queued_bytes[interface] < (getQueueSize(interface)))) {
+            uint16_t s = current_packet_start[interface];
+            int32_t e = queue_cursor[interface]-1; if (e == -1) e = (getQueueSize(interface))-1;
             uint16_t l;
 
             if (s != e) {
-                l = (s < e) ? e - s + 1: (getQueueSize(index)) - s + e + 1;
+                l = (s < e) ? e - s + 1: (getQueueSize(interface)) - s + e + 1;
             } else {
                 l = 1;
             }
 
             if (l >= MIN_L) {
-                queue_height[index]++;
+                queue_height[interface]++;
 
-                fifo16_push(&packet_starts[index], s);
-                fifo16_push(&packet_lengths[index], l);
-                current_packet_start[index] = queue_cursor[index];
+                fifo16_push(&packet_starts[interface], s);
+                fifo16_push(&packet_lengths[interface], l);
+                current_packet_start[interface] = queue_cursor[interface];
             }
 
         }
@@ -742,33 +726,9 @@ void serialCallback(uint8_t sbyte) {
     // Have a look at the command byte first
     if (frame_len == 0 && command == CMD_UNKNOWN) {
         command = sbyte;
-        if  (command == CMD_SEL_INT0 
-                 || command == CMD_SEL_INT1 
-                 || command == CMD_SEL_INT2 
-                 || command == CMD_SEL_INT3 
-                 || command == CMD_SEL_INT4 
-                 || command == CMD_SEL_INT5 
-                 || command == CMD_SEL_INT6 
-                 || command == CMD_SEL_INT7 
-                 || command == CMD_SEL_INT8 
-                 || command == CMD_SEL_INT9 
-                 || command == CMD_SEL_INT10 
-                 || command == CMD_SEL_INT11) {
-            interface = getInterfaceIndex(command);
-        }
-
-    } else if  (command == CMD_INT0_DATA 
-             || command == CMD_INT1_DATA 
-             || command == CMD_INT2_DATA 
-             || command == CMD_INT3_DATA 
-             || command == CMD_INT4_DATA 
-             || command == CMD_INT5_DATA 
-             || command == CMD_INT6_DATA 
-             || command == CMD_INT7_DATA 
-             || command == CMD_INT8_DATA 
-             || command == CMD_INT9_DATA 
-             || command == CMD_INT10_DATA 
-             || command == CMD_INT11_DATA) {
+    } else if  (command == CMD_SEL_INT) {
+        interface = sbyte;
+    } else if  (command == CMD_DATA) {
         if (bt_state != BT_STATE_CONNECTED) cable_state = CABLE_STATE_CONNECTED;
         if (sbyte == FESC) {
             ESCAPE = true;
@@ -779,13 +739,10 @@ void serialCallback(uint8_t sbyte) {
                 ESCAPE = false;
             }
 
-            if (getInterfaceIndex(command) < INTERFACE_COUNT) {
-                    uint8_t index = getInterfaceIndex(command);
-                if (queue_height[index] < CONFIG_QUEUE_MAX_LENGTH && queued_bytes[index] < (getQueueSize(index))) {
-                  queued_bytes[index]++;
-                  packet_queue[index][queue_cursor[index]++] = sbyte;
-                  if (queue_cursor[index] == (getQueueSize(index))) queue_cursor[index] = 0;
-                }
+            if (queue_height[interface] < CONFIG_QUEUE_MAX_LENGTH && queued_bytes[interface] < (getQueueSize(interface))) {
+              queued_bytes[interface]++;
+              packet_queue[interface][queue_cursor[interface]++] = sbyte;
+              if (queue_cursor[interface] == (getQueueSize(interface))) queue_cursor[interface] = 0;
             }
         }
     } else if (command == CMD_INTERFACES) {
@@ -969,7 +926,7 @@ void serialCallback(uint8_t sbyte) {
     } else if (command == CMD_STAT_TX) {
       kiss_indicate_stat_tx();
     } else if (command == CMD_STAT_RSSI) {
-      kiss_indicate_stat_rssi();
+      kiss_indicate_stat_rssi(interface_obj[interface]);
     } else if (command == CMD_RADIO_LOCK) {
       selected_radio = interface_obj[interface];
       update_radio_lock(selected_radio);
@@ -1157,7 +1114,7 @@ void serialCallback(uint8_t sbyte) {
             }
             display_intensity = sbyte;
             di_conf_save(display_intensity);
-            //display_unblank();
+            display_unblank();
         }
 
       #endif
@@ -1176,21 +1133,6 @@ void serialCallback(uint8_t sbyte) {
         }
 
       #endif
-    } else if (command == CMD_FW_LENGTH) {
-        if (sbyte == FESC) {
-              ESCAPE = true;
-          } else {
-              if (ESCAPE) {
-                  if (sbyte == TFEND) sbyte = FEND;
-                  if (sbyte == TFESC) sbyte = FESC;
-                  ESCAPE = false;
-              }
-              if (frame_len < CMD_L) cmdbuf[frame_len++] = sbyte;
-          }
-
-          if (frame_len == FW_LENGTH_LEN) {
-            set_fw_length(cmdbuf);
-          }
     } else if (command == CMD_DISP_BLNK) {
       #if HAS_DISPLAY
         if (sbyte == FESC) {
@@ -1202,7 +1144,7 @@ void serialCallback(uint8_t sbyte) {
                 ESCAPE = false;
             }
             db_conf_save(sbyte);
-            //display_unblank();
+            display_unblank();
         }
 
       #endif
@@ -1216,7 +1158,6 @@ void serialCallback(uint8_t sbyte) {
                 if (sbyte == TFESC) sbyte = FESC;
                 ESCAPE = false;
             }
-            sbyte;
             led_set_intensity(sbyte);
             np_int_conf_save(sbyte);
         }
@@ -1343,7 +1284,7 @@ void loop() {
     #if MCU_VARIANT == MCU_ESP32
       modem_packet_t *modem_packet = NULL;
       if(modem_packet_queue && xQueueReceive(modem_packet_queue, &modem_packet, 0) == pdTRUE && modem_packet) {
-        packet_interface = modem_packet->interface;
+        uint8_t packet_interface = modem_packet->interface;
         read_len[packet_interface] = modem_packet->len;
         last_rssi = modem_packet->rssi;
         last_snr_raw = modem_packet->snr_raw;
@@ -1359,7 +1300,7 @@ void loop() {
     #elif MCU_VARIANT == MCU_NRF52
       modem_packet_t *modem_packet = NULL;
       if(modem_packet_queue && xQueueReceive(modem_packet_queue, &modem_packet, 0) == pdTRUE && modem_packet) {
-        packet_interface = modem_packet->interface;
+        uint8_t packet_interface = modem_packet->interface;
         read_len[packet_interface] = modem_packet->len;
         last_rssi = modem_packet->rssi;
         last_snr_raw = modem_packet->snr_raw;
@@ -1367,8 +1308,8 @@ void loop() {
         free(modem_packet);
         modem_packet = NULL;
 
-        kiss_indicate_stat_rssi();
-        kiss_indicate_stat_snr();
+        kiss_indicate_stat_rssi(interface_obj[packet_interface]);
+        kiss_indicate_stat_snr(interface_obj[packet_interface]);
         kiss_write_packet(packet_interface);
       }
     #endif
@@ -1492,7 +1433,7 @@ void process_serial() {
 void button_event(uint8_t event, unsigned long duration) {
   if (duration > BUTTON_MIN_DURATION) {
       if (duration > BUTTON_9S_DURATION) {
-        bt_bond_wipe();
+        bt_debond_all();
       } else if (duration > BUTTON_6S_DURATION) {
         bt_stop();
         bt_conf_save(false);
