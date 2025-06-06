@@ -340,9 +340,9 @@ uint8_t boot_vector = 0x00;
       void led_id_on()  { npset(0x90, 0, 0x70); }
       void led_id_off() { npset(0, 0, 0); }
     #elif BOARD_MODEL == BOARD_RAK4631 || BOARD_MODEL == BOARD_OPENCOM_XL
-		void led_rx_on()  { digitalWrite(pin_led_rx, HIGH); }
+		void led_rx_on()  { analogWrite(pin_led_rx, 1); }
 		void led_rx_off() {	digitalWrite(pin_led_rx, LOW); }
-		void led_tx_on()  { digitalWrite(pin_led_tx, HIGH); }
+		void led_tx_on()  { analogWrite(pin_led_tx, 1); }
 		void led_tx_off() { digitalWrite(pin_led_tx, LOW); }
 		void led_id_on()  { }
 		void led_id_off() { }
