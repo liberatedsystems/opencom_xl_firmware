@@ -1372,10 +1372,6 @@ void loop() {
       }
     } else {
       led_indicate_not_ready();
-      // shut down all radio interfaces
-      for (int i = 0; i < INTERFACE_COUNT; i++) {
-          stopRadio(interface_obj[i]);
-      }
     }
   }
 
