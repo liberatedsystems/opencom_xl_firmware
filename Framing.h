@@ -55,7 +55,7 @@
   #define CMD_DISP_READ   0x66
   #define CMD_DISP_INT    0x45
   #define CMD_DISP_ADDR   0x63
-  #define CMD_DISP_BLNK   0x64
+  #define CMD_DISP_BLNK   0x99
   #define CMD_DISP_ROT    0x67
   #define CMD_DISP_RCND   0x68
   #define CMD_NP_INT      0x65
